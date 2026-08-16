@@ -1,0 +1,33 @@
+﻿#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+
+const char* ssid = " LINK\;
+const char* password = \774860879AA\;
+
+ESP8266WebServer server(80);
+
+const int relayPin = 5;
+const int highSensorPin = 4;
+const int lowSensorPin = 14;
+const int warningSensorPin = 12;
+const int powerPin = 0;
+
+bool isPumping = false;
+bool systemError = false;
+bool manualMode = false;
+String currentStatus = ;
+String operationLog[10];
+int logIndex = 0;
+
+unsigned long pumpStartTime = 0;
+unsigned long maxPumpTime = 60000UL;
+const unsigned long maxAllowedTime = 300000UL;
+unsigned long lastSensorRead = 0;
+
+bool manualTimerActive = false;
+unsigned long manualTimerDuration = 0;
+
+void addLog(String message) {
+  operationLog[logIndex] = message;
+  logIndex = (logIndex + 1) % 10;
+}
