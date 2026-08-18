@@ -22,7 +22,7 @@ const int liftSensorPin = 13; // D7: سلك كشف رفع الماء (عند م�
 bool isPumping = false; 
 bool systemError = false; 
 bool manualMode = false;
-String currentStatus = "جاري تهيئة النظام..."; // نص لعرضه في المتصفح
+String currentStatus = "جاري التهيئة...";
 String operationLog[10]; // سجل العمليات (آخر 10 عمليات)
 int logIndex = 0;
 
@@ -117,284 +117,284 @@ bool isQuietHours() {
 // دالة بناء صفحة الـ HTML (واجهة المستخدم)
 // ---------------------------------------------------------
 void handleRoot() {
-  String html = "<!DOCTYPE html><html lang='ar' dir='rtl'>";
-  html += "<head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-  html += "<title>مراقبة الخزان</title>";
-  html += "<style>";
-  html += "* { box-sizing: border-box; margin: 0; padding: 0; }";
-  html += "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #eef2f7; padding: 16px; min-height: 100vh; color: #1e293b; display: flex; flex-direction: column; align-items: center; }";
-  html += ".container { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 12px; }";
-  html += "h1 { font-size: 20px; font-weight: 800; color: #1e3a5f; text-align: center; margin: 8px 0 4px; }";
-  
-  // شريط الحالة العلوي
-  html += ".mode-bar { display: flex; align-items: center; justify-content: space-between; background: white; padding: 12px 16px; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }";
-  html += ".mode-title { font-size: 13px; color: #64748b; font-weight: 600; }";
-  html += ".mode-badge { font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }";
-  html += ".mode-badge.auto { background: #dcfce7; color: #15803d; border: 1.5px solid #bbf7d0; }";
-  html += ".mode-badge.manual { background: #dbeafe; color: #1d4ed8; border: 1.5px solid #bfdbfe; }";
-  html += ".badge-dot { width: 6px; height: 6px; border-radius: 50%; }";
-  html += ".auto .badge-dot { background: #16a34a; animation: pulse 2s infinite; }";
-  html += ".manual .badge-dot { background: #2563eb; animation: pulse 1.5s infinite; }";
-  html += "@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }";
-
-  // بطاقة الحالة البطل (Hero Status)
-  html += ".status-card { background: white; border-radius: 18px; padding: 20px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); border: 2px solid transparent; transition: all 0.3s ease; }";
-  if (systemError) {
-    html += ".status-card { background: #fef2f2; border-color: #fca5a5; }";
-  } else if (isPumping) {
-    html += ".status-card { background: #eff6ff; border-color: #93c5fd; }";
-  } else {
-    html += ".status-card { background: #f0fdf4; border-color: #86efac; }";
+  // وقت النظام
+  String sysTime = "--:--:--";
+  time_t nowT = time(nullptr);
+  if (nowT > 1000000000ULL) {
+    struct tm* ti = localtime(&nowT);
+    char buf[20];
+    sprintf(buf, "%02d:%02d:%02d", ti->tm_hour, ti->tm_min, ti->tm_sec);
+    sysTime = String(buf);
   }
-  html += ".status-text { font-size: 18px; font-weight: 700; margin-bottom: 4px; }";
-  if (systemError) html += ".status-text { color: #dc2626; }";
-  else if (isPumping) html += ".status-text { color: #1d4ed8; }";
-  else html += ".status-text { color: #15803d; }";
 
-  // تفاصيل التشغيل
-  html += ".pump-info { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e2e8f0; }";
-  html += ".info-item { text-align: center; flex: 1; }";
-  html += ".info-label { font-size: 10px; color: #94a3b8; font-weight: 700; margin-bottom: 2px; }";
-  html += ".info-val { font-size: 14px; font-weight: 700; color: #334155; }";
-  html += ".info-val.active { color: #16a34a; }";
-  html += ".info-val.inactive { color: #64748b; }";
-  html += ".info-val.timer { color: #2563eb; font-variant-numeric: tabular-nums; }";
-  html += ".divider { width: 1px; height: 28px; background: #e2e8f0; }";
+  String html = "<!DOCTYPE html><html lang='ar' dir='rtl'>";
+  html += "<head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=no'>";
+  html += "<title>نظام الخزان</title><style>";
 
-  // بطاقة التحكم (Controls Card)
-  html += ".card { background: white; border-radius: 18px; padding: 18px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 12px; }";
-  html += ".card-label { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }";
+  // نظام الألوان
+  html += ":root{--blue:#1a56db;--blue-dk:#1343b5;--blue-lt:#e8effd;";
+  html += "--green:#2f9e44;--green-lt:#ebfbee;";
+  html += "--red:#e03131;--red-lt:#fff5f5;";
+  html += "--amber:#e67700;--amber-lt:#fff9db;";
+  html += "--g50:#f8f9fb;--g100:#f0f2f5;--g200:#e2e6ea;";
+  html += "--g400:#9aa3ae;--g600:#4b5563;--g800:#1f2937;";
+  html += "--sh:0 1px 4px rgba(0,0,0,.08);--r:14px;--rs:9px;}";
 
-  // الأزرار
-  html += ".btn { padding: 13px; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.15s ease; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px; }";
-  html += ".btn:active { transform: scale(0.97); opacity: 0.85; }";
-  html += ".btn-success { background: #16a34a; color: white; }";
-  html += ".btn-success:hover { background: #15803d; }";
-  html += ".btn-danger { background: #dc2626; color: white; }";
-  html += ".btn-danger:hover { background: #b91c1c; }";
-  html += ".btn-secondary { background: #f1f5f9; color: #475569; border: 1.5px solid #e2e8f0; }";
-  html += ".btn-secondary:hover { background: #e2e8f0; }";
-  html += ".btn-warning { background: #d97706; color: white; }";
-  html += ".btn-warning:hover { background: #b45309; }";
-  html += ".btn-primary { background: #2563eb; color: white; }";
-  html += ".btn-primary:hover { background: #1d4ed8; }";
+  html += "*{box-sizing:border-box;margin:0;padding:0;}";
+  html += "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Tahoma,sans-serif;";
+  html += "background:var(--g100);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:12px 12px 28px;}";
+  html += ".page{width:100%;max-width:390px;display:flex;flex-direction:column;gap:10px;}";
 
-  html += ".controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }";
+  // رأس الصفحة
+  html += ".hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 2px 2px;}";
+  html += ".hdr-title{font-size:17px;font-weight:800;color:var(--g800);}";
+  html += ".hdr-time{font-size:13px;font-weight:600;color:var(--g400);font-variant-numeric:tabular-nums;}";
 
-  // تايمر التحكم اليدوي
-  html += ".timer-box { background: #eff6ff; border: 2.5px solid #93c5fd; border-radius: 14px; padding: 14px; margin-top: 4px; display: flex; flex-direction: column; gap: 10px; }";
-  html += ".timer-box-title { font-size: 12px; font-weight: 800; color: #1d4ed8; display: flex; align-items: center; gap: 6px; }";
-  html += ".timer-countdown { font-size: 32px; font-weight: 900; color: #1d4ed8; text-align: center; margin: 4px 0; font-variant-numeric: tabular-nums; letter-spacing: 2px; }";
-  html += ".timer-input-group { display: flex; gap: 8px; align-items: center; }";
-  html += ".timer-input { flex: 1; padding: 10px; border: 1.5px solid #bfdbfe; border-radius: 9px; font-size: 15px; text-align: center; background: white; }";
-  html += ".timer-input:focus { border-color: #2563eb; outline: none; }";
-  html += ".timer-desc { font-size: 10px; color: #64748b; text-align: center; }";
+  // شريط الوضع والسوتش
+  html += ".mode-bar{display:flex;align-items:center;justify-content:space-between;background:white;border-radius:var(--r);padding:10px 14px;box-shadow:var(--sh);}";
+  html += ".mode-info{display:flex;align-items:center;gap:8px;}";
+  html += ".mdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}";
+  html += ".mdot.auto{background:var(--green);animation:blink 2.5s infinite;}";
+  html += ".mdot.manual{background:var(--blue);animation:blink 1.8s infinite;}";
+  html += ".mdot.err{background:var(--red);}";
+  html += "@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}";
+  html += ".mlabel{font-size:13px;font-weight:700;color:var(--g800);}";
+  html += ".switch-link{display:flex;align-items:center;gap:8px;text-decoration:none;}";
+  html += ".switch-lbl{font-size:12px;font-weight:700;}";
+  html += ".switch-lbl.auto{color:var(--green);}.switch-lbl.manual{color:var(--blue);}.switch-lbl.err{color:var(--red);}";
+  html += ".switch-lbl.on{color:var(--green);}.switch-lbl.off{color:var(--g400);}";
+  html += ".switch-box{width:44px;height:24px;border-radius:12px;position:relative;transition:.25s ease;display:flex;align-items:center;padding:2px;}";
+  html += ".switch-box.auto{background:#c3fae8;}";
+  html += ".switch-box.manual{background:#d0ebff;}";
+  html += ".switch-box.err{background:#ffe3e3;cursor:not-allowed;}";
+  html += ".switch-box.on{background:#c3fae8;}";
+  html += ".switch-box.off{background:var(--g200);}";
+  html += ".switch-thumb{width:20px;height:20px;border-radius:50%;transition:.25s ease;box-shadow:0 1px 3px rgba(0,0,0,.2);}";
+  html += ".switch-box.auto .switch-thumb{background:var(--green);transform:translateX(0);}";
+  html += ".switch-box.manual .switch-thumb{background:var(--blue);transform:translateX(-20px);}";
+  html += ".switch-box.err .switch-thumb{background:var(--red);transform:translateX(0);}";
+  html += ".switch-box.on .switch-thumb{background:var(--green);transform:translateX(-20px);}";
+  html += ".switch-box.off .switch-thumb{background:white;transform:translateX(0);}";
+  html += ".pump-ctrl-box{display:flex;align-items:center;justify-content:space-between;background:var(--g50);border:1.5px solid var(--g200);border-radius:var(--rs);padding:10px 12px;}";
 
-  // التبويب الذكي (Tabs) للتفاصيل والسجلات
-  html += ".tabs-card { background: white; border-radius: 18px; padding: 14px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }";
-  html += ".tabs-header { display: flex; background: #f1f5f9; padding: 4px; border-radius: 12px; margin-bottom: 12px; }";
-  html += ".tab-btn { flex: 1; padding: 8px; text-align: center; font-size: 13px; font-weight: 700; border-radius: 9px; cursor: pointer; color: #64748b; border: none; background: transparent; transition: all 0.2s ease; }";
-  html += ".tab-btn.active { background: white; color: #1e3a5f; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }";
-  html += ".tab-content { display: none; }";
-  html += ".tab-content.active { display: block; }";
+  // بطاقة الحالة
+  html += ".s-card{background:white;border-radius:var(--r);padding:16px;box-shadow:var(--sh);border-right:4px solid var(--g200);}";
+  if (systemError)    html += ".s-card{border-right-color:var(--red);background:var(--red-lt);}";
+  else if (isPumping) html += ".s-card{border-right-color:var(--blue);background:var(--blue-lt);}";
+  else                html += ".s-card{border-right-color:var(--green);background:var(--green-lt);}";
+  html += ".s-text{font-size:15px;font-weight:700;margin-bottom:10px;}";
+  if (systemError)    html += ".s-text{color:var(--red);}";
+  else if (isPumping) html += ".s-text{color:var(--blue);}";
+  else                html += ".s-text{color:var(--green);}";
+  html += ".s-meta{display:flex;border-top:1px solid var(--g200);padding-top:10px;}";
+  html += ".s-item{flex:1;text-align:center;}";
+  html += ".s-item+.s-item{border-right:1px solid var(--g200);}";
+  html += ".s-lbl{font-size:10px;color:var(--g400);font-weight:600;margin-bottom:3px;letter-spacing:.3px;}";
+  html += ".s-val{font-size:14px;font-weight:700;color:var(--g800);}";
+  html += ".s-val.on{color:var(--green);}.s-val.off{color:var(--g400);}.s-val.tk{color:var(--blue);font-variant-numeric:tabular-nums;}";
 
-  // سجل العمليات
-  html += ".log-list { display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow-y: auto; }";
-  html += ".log-item { font-size: 12px; color: #475569; padding: 7px 10px; background: #f8fafc; border-radius: 8px; text-align: right; border-right: 3.5px solid #cbd5e1; }";
+  // بطاقة التحكم
+  html += ".c-card{background:white;border-radius:var(--r);padding:14px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:10px;}";
+  html += ".sec-lbl{font-size:10px;font-weight:800;color:var(--g400);text-transform:uppercase;letter-spacing:.6px;}";
+  html += ".btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}";
+  html += ".btn{display:flex;align-items:center;justify-content:center;padding:11px 8px;border:none;border-radius:var(--rs);";
+  html += "font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;transition:.15s;}";
+  html += ".btn:active{transform:scale(.97);opacity:.85;}";
+  html += ".btn.blue{background:var(--blue);color:white;}.btn.blue:hover{background:var(--blue-dk);}";
+  html += ".btn.red{background:var(--red);color:white;}.btn.red:hover{background:#c92a2a;}";
+  html += ".btn.ghost{background:var(--g50);color:var(--g600);border:1.5px solid var(--g200);}.btn.ghost:hover{background:var(--g200);}";
+  html += ".btn.amber{background:var(--amber);color:white;}.btn.amber:hover{background:#d46b08;}";
+  html += ".btn.full{grid-column:1/-1;}";
 
-  // الإعدادات
-  html += ".settings-group { display: flex; flex-direction: column; gap: 8px; }";
-  html += ".settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }";
-  html += ".settings-label { font-size: 13px; color: #475569; font-weight: 600; }";
-  html += ".settings-input { width: 75px; padding: 8px; border: 1.5px solid #e2e8f0; border-radius: 9px; font-size: 14px; text-align: center; }";
-  html += ".settings-input:focus { border-color: #2563eb; outline: none; }";
-  html += ".settings-desc { font-size: 10px; color: #94a3b8; text-align: center; margin-top: 4px; }";
+  // تايمر
+  html += ".tmr{background:var(--blue-lt);border:1.5px solid #c1d4f7;border-radius:var(--rs);padding:12px;}";
+  html += ".tmr-title{font-size:11px;font-weight:800;color:var(--blue);margin-bottom:8px;}";
+  html += ".tmr-big{font-size:30px;font-weight:900;color:var(--blue);text-align:center;letter-spacing:3px;font-variant-numeric:tabular-nums;margin:4px 0 8px;}";
+  html += ".tmr-row{display:flex;gap:8px;align-items:center;}";
+  html += ".tmr-inp{flex:1;padding:9px;border:1.5px solid #c1d4f7;border-radius:var(--rs);font-size:14px;text-align:center;background:white;outline:none;}";
+  html += ".tmr-inp:focus{border-color:var(--blue);}";
+  html += ".tmr-hint{font-size:10px;color:var(--g400);text-align:center;margin-top:5px;}";
 
-  html += "</style></head><body>";
-  html += "<div class='container'>";
-  html += "<h1>مراقبة الخزان</h1>";
+  // تبويبات
+  html += ".tabs{background:white;border-radius:var(--r);padding:12px;box-shadow:var(--sh);}";
+  html += ".tabs-nav{display:flex;background:var(--g100);padding:3px;border-radius:var(--rs);margin-bottom:12px;}";
+  html += ".tab-btn{flex:1;padding:7px;text-align:center;font-size:13px;font-weight:700;border-radius:7px;cursor:pointer;color:var(--g400);border:none;background:transparent;transition:.2s;}";
+  html += ".tab-btn.active{background:white;color:var(--g800);box-shadow:0 1px 4px rgba(0,0,0,.06);}";
+  html += ".tab-pane{display:none;}.tab-pane.active{display:block;}";
 
-  // شريط الحالة والوضع العلوي
+  // سجل
+  html += ".log-list{display:flex;flex-direction:column;gap:4px;max-height:150px;overflow-y:auto;}";
+  html += ".log-item{font-size:12px;color:var(--g600);padding:6px 10px;background:var(--g50);border-radius:6px;border-right:3px solid var(--g200);}";
+
+  // إعدادات
+  html += ".set-section{margin-bottom:14px;}";
+  html += ".set-title{font-size:10px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;";
+  html += "padding-bottom:5px;border-bottom:1.5px solid var(--blue-lt);margin-bottom:9px;}";
+  html += ".set-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0;}";
+  html += ".set-lbl{font-size:13px;color:var(--g600);font-weight:600;}";
+  html += ".set-inp{width:70px;padding:7px;border:1.5px solid var(--g200);border-radius:var(--rs);font-size:13px;text-align:center;outline:none;}";
+  html += ".set-inp:focus{border-color:var(--blue);}";
+  html += ".set-hint{font-size:10px;color:var(--g400);text-align:center;margin-top:6px;}";
+
+  html += "</style></head><body><div class='page'>";
+
+  // رأس
+  html += "<div class='hdr'><div class='hdr-title'>نظام الخزان</div>";
+  html += "<div class='hdr-time' id='sysTimeLabel'>" + sysTime + "</div></div>";
+
+  // شريط الوضع مع السوتش
   html += "<div class='mode-bar'>";
-  html += "<span class='mode-title'>وضع التشغيل</span>";
-  if (manualMode) {
-    html += "<div class='mode-badge manual'><div class='badge-dot'></div>يدوي</div>";
+  if (systemError) {
+    html += "<div class='mode-info'><div class='mdot err'></div><div class='mlabel'>حالة النظام</div></div>";
+    html += "<div class='switch-link'><span class='switch-lbl err'>طوارئ (مقفل)</span><div class='switch-box err'><div class='switch-thumb'></div></div></div>";
+  } else if (manualMode) {
+    html += "<div class='mode-info'><div class='mdot manual'></div><div class='mlabel'>وضع التشغيل</div></div>";
+    html += "<a href='/toggle-mode' class='switch-link' title='انقر للتبديل للتلقائي'>";
+    html += "<span class='switch-lbl manual'>يدوي</span>";
+    html += "<div class='switch-box manual'><div class='switch-thumb'></div></div></a>";
   } else {
-    html += "<div class='mode-badge auto'><div class='badge-dot'></div>تلقائي</div>";
+    html += "<div class='mode-info'><div class='mdot auto'></div><div class='mlabel'>وضع التشغيل</div></div>";
+    html += "<a href='/toggle-mode' class='switch-link' title='انقر للتبديل لليدوي'>";
+    html += "<span class='switch-lbl auto'>تلقائي</span>";
+    html += "<div class='switch-box auto'><div class='switch-thumb'></div></div></a>";
   }
   html += "</div>";
 
-  // بطاقة الحالة البطل
-  html += "<div class='status-card'>";
-  html += "<div class='status-text' id='statusText'>" + currentStatus + "</div>";
-  html += "<div class='pump-info' id='pumpRow'>";
-  
+  // بطاقة الحالة
+  html += "<div class='s-card'><div class='s-text' id='statusText'>" + currentStatus + "</div>";
+  html += "<div class='s-meta' id='pumpRow'>";
   if (isPumping && !systemError) {
-    long elapsed = (millis() - pumpStartTime) / 1000;
-    String elS = (elapsed % 60 < 10 ? "0" : "") + String(elapsed % 60);
-    html += "<div class='info-item'><div class='info-label'>الدينمو</div><div class='info-val active'>يعمل</div></div>";
-    html += "<div class='divider'></div>";
-    html += "<div class='info-item'><div class='info-label'>وقت التشغيل</div><div class='info-val'>" + String(elapsed / 60) + ":" + elS + "</div></div>";
-    
+    long el = (millis() - pumpStartTime) / 1000;
+    String elS = (el % 60 < 10 ? "0" : "") + String(el % 60);
+    html += "<div class='s-item'><div class='s-lbl'>الدينمو</div><div class='s-val on'>يعمل</div></div>";
+    html += "<div class='s-item'><div class='s-lbl'>مدة التشغيل</div><div class='s-val tk'>" + String(el/60) + ":" + elS + "</div></div>";
     if (manualTimerActive) {
-      long rem = ((long)manualTimerDuration - (long)(millis() - pumpStartTime)) / 1000;
-      if (rem < 0) rem = 0;
-      String remS = (rem % 60 < 10 ? "0" : "") + String(rem % 60);
-      html += "<div class='divider'></div>";
-      html += "<div class='info-item'><div class='info-label'>المتبقي</div><div class='info-val timer' id='statusTimer'>" + String(rem / 60) + ":" + remS + "</div></div>";
+      long rem = ((long)manualTimerDuration-(long)(millis()-pumpStartTime))/1000;
+      if(rem<0)rem=0;
+      String remS=(rem%60<10?"0":"")+String(rem%60);
+      html += "<div class='s-item'><div class='s-lbl'>المتبقي</div><div class='s-val tk' id='statusTimer'>" + String(rem/60) + ":" + remS + "</div></div>";
     }
   } else {
-    html += "<div class='info-item'><div class='info-label'>الدينمو</div><div class='info-val inactive'>متوقف</div></div>";
+    html += "<div class='s-item'><div class='s-lbl'>الدينمو</div><div class='s-val off'>متوقف</div></div>";
   }
-  
   html += "</div></div>";
 
   // بطاقة التحكم
+  html += "<div class='c-card'>";
   if (systemError) {
-    html += "<div class='card'>";
-    html += "<span class='card-label'>إجراء أمان مطلوب</span>";
-    html += "<a href='/reset' class='btn btn-danger' style='padding:15px; font-size:16px;'>إعادة ضبط الطوارئ</a>";
-    html += "</div>";
+    html += "<div class='sec-lbl'>إجراء مطلوب</div>";
+    html += "<a href='/reset' class='btn red full'>إعادة ضبط النظام</a>";
   } else {
-    html += "<div class='card'>";
-    html += "<span class='card-label'>التحكم في المحرك</span>";
-    
-    // أزرار تشغيل وإيقاف تظهر فقط في الوضع اليدوي
+    html += "<div class='sec-lbl'>التحكم</div>";
     if (manualMode) {
-      html += "<div class='controls-grid'>";
-      html += "<a href='/manual-on' class='btn btn-success'>تشغيل</a>";
-      html += "<a href='/manual-off' class='btn btn-danger'>إيقاف</a>";
-      html += "</div>";
-    }
-    
-    // أزرار التحكم بالنظام
-    html += "<div class='controls-grid'>";
-    html += "<a href='/toggle-mode' class='btn btn-secondary'>";
-    html += manualMode ? "الوضع التلقائي" : "الوضع اليدوي";
-    html += "</a>";
-    html += "<a href='/reset' class='btn btn-secondary'>تصفير</a>";
-    html += "</div>";
-
-    // تايمر الوضع اليدوي
-    if (manualMode) {
-      html += "<div class='timer-box'>";
-      html += "<div class='timer-box-title'>⏱️ تايمر الإيقاف التلقائي</div>";
-      if (manualTimerActive && isPumping) {
-        long rem = ((long)manualTimerDuration - (long)(millis() - pumpStartTime)) / 1000;
-        if (rem < 0) rem = 0;
-        String remS = (rem % 60 < 10 ? "0" : "") + String(rem % 60);
-        html += "<div class='timer-countdown' id='timerBig'>" + String(rem / 60) + ":" + remS + "</div>";
-        html += "<a href='/cancel-timer' class='btn btn-warning'>إلغاء التايمر</a>";
+      html += "<div class='pump-ctrl-box'>";
+      html += "<span style='font-size:13px;color:var(--g800);font-weight:700;'>تشغيل الدينمو</span>";
+      if (isPumping) {
+        html += "<a href='/manual-off' class='switch-link' title='انقر لإيقاف الدينمو'>";
+        html += "<span class='switch-lbl on'>يعمل</span>";
+        html += "<div class='switch-box on'><div class='switch-thumb'></div></div></a>";
       } else {
-        html += "<form action='/set-manual-timer' method='GET' style='margin:0;'>";
-        html += "<div class='timer-input-group'>";
-        html += "<input type='number' name='min' class='timer-input' min='1' max='" + String(maxPumpTime / 60000UL) + "' placeholder='دقائق' required>";
-        html += "<button type='submit' class='btn btn-primary' style='padding: 10px 16px;'>تفعيل</button>";
-        html += "</div></form>";
-        html += "<div class='timer-desc'>الحد الأقصى: " + String(maxPumpTime / 60000UL) + " دقيقة (وقت الطوارئ)</div>";
+        html += "<a href='/manual-on' class='switch-link' title='انقر لتشغيل الدينمو'>";
+        html += "<span class='switch-lbl off'>متوقف</span>";
+        html += "<div class='switch-box off'><div class='switch-thumb'></div></div></a>";
       }
       html += "</div>";
     }
-    html += "</div>";
+    html += "<a href='/reset' class='btn ghost full'>تصفير النظام</a>";
+    if (manualMode) {
+      html += "<div class='tmr'><div class='tmr-title'>تايمر الإيقاف التلقائي</div>";
+      if (manualTimerActive && isPumping) {
+        long rem=((long)manualTimerDuration-(long)(millis()-pumpStartTime))/1000;
+        if(rem<0)rem=0;
+        String remS=(rem%60<10?"0":"")+String(rem%60);
+        html += "<div class='tmr-big' id='timerBig'>" + String(rem/60) + ":" + remS + "</div>";
+        html += "<a href='/cancel-timer' class='btn amber'>إلغاء التايمر</a>";
+      } else {
+        html += "<form action='/set-manual-timer' method='GET' style='margin:0'>";
+        html += "<div class='tmr-row'>";
+        html += "<input type='number' name='min' class='tmr-inp' min='1' max='" + String(maxPumpTime/60000UL) + "' placeholder='دقائق' required>";
+        html += "<button type='submit' class='btn blue' style='padding:9px 14px'>تفعيل</button></div></form>";
+        html += "<div class='tmr-hint'>أدخل عدد الدقائق (1 - " + String(maxPumpTime/60000UL) + ")</div>";
+      }
+      html += "</div>";
+    }
   }
-
-  html += "<div class='tabs-card'>";
-  html += "<div class='tabs-header'>";
-  html += "<button class='tab-btn active' onclick=\"openTab(event, 'logTab')\">📋 سجل العمليات</button>";
-  html += "<button class='tab-btn' onclick=\"openTab(event, 'settingsTab')\">⚙️ الإعدادات</button>";
   html += "</div>";
 
-  // تبويب السجل
-  html += "<div id='logTab' class='tab-content active'>";
-  html += "<div class='log-list' id='logList'>";
+  // التبويبات
+  html += "<div class='tabs'>";
+  html += "<div class='tabs-nav'>";
+  html += "<button class='tab-btn active' onclick=\"openTab(event,'logPane')\">سجل العمليات</button>";
+  html += "<button class='tab-btn' onclick=\"openTab(event,'setPane')\">الإعدادات</button>";
+  html += "</div>";
+
+  // السجل
+  html += "<div id='logPane' class='tab-pane active'><div class='log-list' id='logList'>";
   for (int i = 0; i < 10; i++) {
-    int idx = (logIndex - 1 - i + 10) % 10;
-    if (operationLog[idx] != "") {
-      html += "<div class='log-item'>" + operationLog[idx] + "</div>";
-    }
+    int idx = (logIndex-1-i+10)%10;
+    if (operationLog[idx] != "") html += "<div class='log-item'>" + operationLog[idx] + "</div>";
   }
   html += "</div></div>";
 
-  // تبويب الإعدادات
-  html += "<div id='settingsTab' class='tab-content'>";
-  html += "<form action='/set-timeout' method='GET' class='settings-group'>";
-  html += "<div class='settings-row'>";
-  html += "<span class='settings-label'>حد وقت الطوارئ (دقائق)</span>";
-  html += "<input type='number' name='minutes' class='settings-input' min='1' max='300' value='" + String(maxPumpTime / 60000UL) + "' required>";
-  html += "</div>";
-  html += "<div class='settings-row'>";
-  html += "<span class='settings-label'>زمن كشف رفع الماء (ثواني)</span>";
-  html += "<input type='number' name='liftSec' class='settings-input' min='1' max='300' value='" + String(liftTimeout / 1000UL) + "' required>";
-  html += "</div>";
-  html += "<div class='settings-row' style='margin-top: 10px; border-top: 1px solid #e2e8f0; padding-top: 10px;'>";
-  html += "<span class='settings-label'>تفعيل وقت الهدوء المحظور</span>";
-  html += "<input type='checkbox' name='quietEnabled' value='1' style='width: 18px; height: 18px; cursor: pointer;' " + String(quietModeEnabled ? "checked" : "") + ">";
-  html += "</div>";
-  html += "<div class='settings-row'>";
-  html += "<span class='settings-label'>ساعة البدء (0-23)</span>";
-  html += "<input type='number' name='quietStart' class='settings-input' min='0' max='23' value='" + String(quietStartHour) + "'>";
-  html += "</div>";
-  html += "<div class='settings-row'>";
-  html += "<span class='settings-label'>ساعة الانتهاء (0-23)</span>";
-  html += "<input type='number' name='quietEnd' class='settings-input' min='0' max='23' value='" + String(quietEndHour) + "'>";
-  html += "</div>";
-  html += "<button type='submit' class='btn btn-primary' style='padding: 10px;'>حفظ الإعدادات</button>";
-  html += "</form>";
-  html += "<div class='settings-desc'>حد الطوارئ: 1-300 دقيقة | زمن رفع الماء: 1-300 ثانية | وقت الهدوء: 0-23 ساعة</div>";
+  // الإعدادات
+  html += "<div id='setPane' class='tab-pane'>";
+  html += "<form action='/set-timeout' method='GET'>";
+
+  html += "<div class='set-section'>";
+  html += "<div class='set-title'>حماية المضخة</div>";
+  html += "<div class='set-row'><span class='set-lbl'>وقت الطوارئ (دقائق)</span>";
+  html += "<input type='number' name='minutes' class='set-inp' min='1' max='300' value='" + String(maxPumpTime/60000UL) + "' required></div>";
+  html += "<div class='set-row'><span class='set-lbl'>كشف رفع الماء (ثواني)</span>";
+  html += "<input type='number' name='liftSec' class='set-inp' min='1' max='300' value='" + String(liftTimeout/1000UL) + "' required></div>";
   html += "</div>";
 
-  html += "</div>"; // tabs-card
+  html += "<div class='set-section'>";
+  html += "<div class='set-title'>وقت الهدوء</div>";
+  html += "<div class='set-row'><span class='set-lbl'>تفعيل وقت الهدوء</span>";
+  html += "<input type='checkbox' name='quietEnabled' value='1' style='width:18px;height:18px;cursor:pointer;accent-color:var(--blue)' " + String(quietModeEnabled ? "checked" : "") + "></div>";
+  html += "<div class='set-row'><span class='set-lbl'>ساعة البدء (0-23)</span>";
+  html += "<input type='number' name='quietStart' class='set-inp' min='0' max='23' value='" + String(quietStartHour) + "'></div>";
+  html += "<div class='set-row'><span class='set-lbl'>ساعة الانتهاء (0-23)</span>";
+  html += "<input type='number' name='quietEnd' class='set-inp' min='0' max='23' value='" + String(quietEndHour) + "'></div>";
+  html += "</div>";
 
-  // عرض وقت النظام
-  String currentTimeStr = "غير متزامن";
-  time_t now = time(nullptr);
-  if (now > 1000000000ULL) {
-    struct tm* timeinfo = localtime(&now);
-    char buf[20];
-    sprintf(buf, "%02d:%02d:%02d", timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-    currentTimeStr = String(buf);
-  }
-  html += "<div style='font-size: 11px; color: #64748b; text-align: center; margin-top: 8px; font-weight: 600;'>وقت النظام الحالي: <span id='sysTimeLabel'>" + currentTimeStr + "</span></div>";
+  html += "<button type='submit' class='btn blue full' style='margin-top:4px'>حفظ الإعدادات</button>";
+  html += "<div class='set-hint'>الطوارئ: 1-300 دقيقة &nbsp;|&nbsp; الرفع: 1-300 ثانية &nbsp;|&nbsp; الهدوء: 0-23</div>";
+  html += "</form></div>";
 
-  html += "</div>"; // container
+  html += "</div></div>"; // tabs + page
 
-  // JavaScript للتحديث التلقائي والتبويب
+  // جافا سكريبت للتبويب والتحديث اللحظي
   html += "<script>";
-  html += "function openTab(evt, tabName) {";
-  html += "  var i, tabcontent, tablinks;";
-  html += "  tabcontent = document.getElementsByClassName('tab-content');";
-  html += "  for (i = 0; i < tabcontent.length; i++) tabcontent[i].classList.remove('active');";
-  html += "  tablinks = document.getElementsByClassName('tab-btn');";
-  html += "  for (i = 0; i < tablinks.length; i++) tablinks[i].classList.remove('active');";
-  html += "  document.getElementById(tabName).classList.add('active');";
-  html += "  evt.currentTarget.classList.add('active');";
+  html += "function openTab(e, tabId) {";
+  html += "  document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.remove('active'); });";
+  html += "  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });";
+  html += "  var target = document.getElementById(tabId);";
+  html += "  if (target) target.classList.add('active');";
+  html += "  if (e && e.currentTarget) e.currentTarget.classList.add('active');";
   html += "}";
-
   html += "function updateData() {";
-  html += "  fetch('/status').then(r => r.json()).then(data => {";
-  html += "    var st = document.getElementById('statusText'); if(st) st.textContent = data.status;";
-  html += "    var pr = document.getElementById('pumpRow'); if(pr) pr.innerHTML = data.pumpRow;";
-  html += "    var ll = document.getElementById('logList'); if(ll) ll.innerHTML = data.logs;";
-  html += "    var tl = document.getElementById('sysTimeLabel'); if(tl) tl.textContent = data.systemTime;";
-  
+  html += "  fetch('/status').then(function(r){ return r.json(); }).then(function(d){";
+  html += "    var st = document.getElementById('statusText'); if (st) st.textContent = d.status;";
+  html += "    var pr = document.getElementById('pumpRow'); if (pr) pr.innerHTML = d.pumpRow;";
+  html += "    var ll = document.getElementById('logList'); if (ll) ll.innerHTML = d.logs;";
+  html += "    var tl = document.getElementById('sysTimeLabel'); if (tl) tl.textContent = d.systemTime;";
   html += "    var tb = document.getElementById('timerBig');";
-  html += "    if (tb && data.timerRemaining >= 0) {";
-  html += "      var m = Math.floor(data.timerRemaining / 60);";
-  html += "      var s = data.timerRemaining % 60;";
+  html += "    if (tb && d.timerRemaining >= 0) {";
+  html += "      var m = Math.floor(d.timerRemaining / 60);";
+  html += "      var s = d.timerRemaining % 60;";
   html += "      tb.textContent = m + ':' + (s < 10 ? '0' : '') + s;";
   html += "    }";
-  
   html += "    var tc = document.getElementById('statusTimer');";
-  html += "    if (tc && data.timerRemaining >= 0) {";
-  html += "      var m = Math.floor(data.timerRemaining / 60);";
-  html += "      var s = data.timerRemaining % 60;";
+  html += "    if (tc && d.timerRemaining >= 0) {";
+  html += "      var m = Math.floor(d.timerRemaining / 60);";
+  html += "      var s = d.timerRemaining % 60;";
   html += "      tc.textContent = m + ':' + (s < 10 ? '0' : '') + s;";
   html += "    }";
-  html += "  });";
+  html += "  }).catch(function(err){});";
   html += "}";
   html += "setInterval(updateData, 1000);";
-  html += "</script>";
-  html += "</body></html>";
+  html += "</script></body></html>";
 
   server.send(200, "text/html", html);
 }
@@ -407,19 +407,17 @@ void handleStatus() {
   if (isPumping && !systemError) {
     long elapsed = (millis() - pumpStartTime) / 1000;
     String elS = (elapsed % 60 < 10 ? "0" : "") + String(elapsed % 60);
-    pumpRow += "<div class='info-item'><div class='info-label'>الدينمو</div><div class='info-val active'>يعمل</div></div>";
-    pumpRow += "<div class='divider'></div>";
-    pumpRow += "<div class='info-item'><div class='info-label'>وقت التشغيل</div><div class='info-val'>" + String(elapsed / 60) + ":" + elS + "</div></div>";
+    pumpRow += "<div class='s-item'><div class='s-lbl'>الدينمو</div><div class='s-val on'>يعمل</div></div>";
+    pumpRow += "<div class='s-item'><div class='s-lbl'>مدة التشغيل</div><div class='s-val tk'>" + String(elapsed / 60) + ":" + elS + "</div></div>";
     
     if (manualTimerActive) {
       long remaining = ((long)manualTimerDuration - (long)(millis() - pumpStartTime)) / 1000;
       if (remaining < 0) remaining = 0;
       String remS = (remaining % 60 < 10 ? "0" : "") + String(remaining % 60);
-      pumpRow += "<div class='divider'></div>";
-      pumpRow += "<div class='info-item'><div class='info-label'>المتبقي</div><div class='info-val timer' id='statusTimer'>" + String(remaining / 60) + ":" + remS + "</div></div>";
+      pumpRow += "<div class='s-item'><div class='s-lbl'>المتبقي</div><div class='s-val tk' id='statusTimer'>" + String(remaining / 60) + ":" + remS + "</div></div>";
     }
   } else {
-    pumpRow += "<div class='info-item'><div class='info-label'>الدينمو</div><div class='info-val inactive'>متوقف</div></div>";
+    pumpRow += "<div class='s-item'><div class='s-lbl'>الدينمو</div><div class='s-val off'>متوقف</div></div>";
   }
   json += "\"pumpRow\":\"" + pumpRow + "\",";
 
@@ -439,7 +437,7 @@ void handleStatus() {
   }
   json += "\"logs\":\"" + logs + "\",";
 
-  String currentTimeStr = "غير متزامن";
+  String currentTimeStr = "--:--:--";
   time_t nowTime = time(nullptr);
   if (nowTime > 1000000000ULL) {
     struct tm* timeinfo = localtime(&nowTime);
@@ -454,13 +452,13 @@ void handleStatus() {
 }
 
 void handleReset() {
-  systemError = false;   // إلغاء حالة الطوارئ
-  isPumping = false;     // إيقاف حالة الضخ
-  manualMode = false;    // إلغاء الوضع اليدوي
-  digitalWrite(relayPin, HIGH); // التأكد من إطفاء الدينمو للأمان
-  currentStatus = "تم إعادة ضبط النظام";
-  addLog("تم إعادة ضبط النظام");
-  saveSettings(); // حفظ التغييرات في EEPROM
+  systemError = false;
+  isPumping = false;
+  manualMode = false;
+  digitalWrite(relayPin, HIGH);
+  currentStatus = "تمت إعادة ضبط النظام";
+  addLog("إعادة ضبط النظام");
+  saveSettings();
   
   server.sendHeader("Location", "/", true);
   server.send(303);
@@ -470,9 +468,9 @@ void handleReset() {
 void handleToggleMode() {
   if (!systemError) {
     manualMode = !manualMode;
-    currentStatus = manualMode ? "تم التبديل للوضع اليدوي" : "تم التبديل للوضع التلقائي";
+    currentStatus = manualMode ? "الوضع اليدوي" : "الوضع التلقائي";
     addLog(manualMode ? "تبديل للوضع اليدوي" : "تبديل للوضع التلقائي");
-    saveSettings(); // حفظ الوضع الجديد
+    saveSettings();
   }
   server.sendHeader("Location", "/", true);
   server.send(303);
@@ -488,11 +486,11 @@ void handleManualOn() {
     digitalWrite(relayPin, LOW);
     isPumping = true;
     pumpStartTime = millis();
-    manualTimerActive = false;  // يبدأ بدون تايمر - يُفعَّل لاحقاً إن أراد المستخدم
+    manualTimerActive = false;
     manualTimerDuration = 0;
-    currentStatus = "🖐 تشغيل يدوي - جاري التعبئة";
-    addLog("تم التشغيل اليدوي للدينمو");
-    saveSettings(); // حفظ الوضع اليدوي
+    currentStatus = "جاري الضخ يدوياً";
+    addLog("بدء الضخ يدوياً");
+    saveSettings();
   }
   server.sendHeader("Location", "/", true);
   server.send(303);
@@ -502,22 +500,21 @@ void handleManualOn() {
 void handleSetManualTimer() {
   if (!systemError && server.hasArg("min")) {
     int requestedMin = server.arg("min").toInt();
-    int maxMin = (int)(maxPumpTime / 60000UL); // الحد الأقصى = وقت الطوارئ
+    int maxMin = (int)(maxPumpTime / 60000UL);
     if (requestedMin < 1) requestedMin = 1;
-    if (requestedMin > maxMin) requestedMin = maxMin; // تقييد بالحد الأقصى
+    if (requestedMin > maxMin) requestedMin = maxMin;
     manualTimerDuration = (unsigned long)requestedMin * 60000UL;
     manualTimerActive = true;
-    // إذا كان الدينمو لا يعمل بعد، شغّله الآن
     if (!isPumping) {
       if (!manualMode) { manualMode = true; addLog("تبديل للوضع اليدوي"); }
       digitalWrite(relayPin, LOW);
       isPumping = true;
       pumpStartTime = millis();
     }
-    currentStatus = "⏱ تايمر يدوي: " + String(requestedMin) + " دقيقة";
+    currentStatus = "ضخ يدوي - سيتوقف بعد " + String(requestedMin) + " دقيقة";
     addLog("تايمر يدوي: " + String(requestedMin) + " دقيقة");
     Serial.println("تايمر يدوي: " + String(requestedMin) + " دقيقة");
-    saveSettings(); // حفظ الوضع اليدوي
+    saveSettings();
   }
   server.sendHeader("Location", "/", true);
   server.send(303);
@@ -527,8 +524,8 @@ void handleSetManualTimer() {
 void handleCancelTimer() {
   manualTimerActive = false;
   manualTimerDuration = 0;
-  currentStatus = "🖐 يدوي - التايمر ملغى";
-  addLog("تم إلغاء التايمر اليدوي");
+  currentStatus = "جاري الضخ يدوياً (التايمر ملغى)";
+  addLog("إلغاء التايمر اليدوي");
   server.sendHeader("Location", "/", true);
   server.send(303);
 }
@@ -540,8 +537,8 @@ void handleManualOff() {
     isPumping = false;
     manualTimerActive = false;
     manualTimerDuration = 0;
-    currentStatus = "تم الإيقاف اليدوي";
-    addLog("تم الإيقاف اليدوي للدينمو");
+    currentStatus = "تم إيقاف الدينمو";
+    addLog("إيقاف يدوي للدينمو");
   }
   server.sendHeader("Location", "/", true);
   server.send(303);
@@ -557,7 +554,7 @@ void handleSetTimeout() {
     if (minutes >= 1 && minutes <= 300) {
       maxPumpTime = (unsigned long)minutes * 60000UL;
       statusMsg += "تم تحديث وقت الطوارئ إلى " + String(minutes) + " دقيقة. ";
-      addLog("تم تحديث وقت الطوارئ: " + String(minutes) + " دقيقة");
+      addLog("تحديث وقت الطوارئ: " + String(minutes) + " دقيقة");
       updated = true;
     }
   }
@@ -566,19 +563,18 @@ void handleSetTimeout() {
     int seconds = server.arg("liftSec").toInt();
     if (seconds >= 1 && seconds <= 300) {
       liftTimeout = (unsigned long)seconds * 1000UL;
-      statusMsg += "تم تحديث زمن رفع الماء إلى " + String(seconds) + " ثانية. ";
-      addLog("تم تحديث زمن رفع الماء: " + String(seconds) + " ثانية");
+      statusMsg += "تم تحديث زمن كشف رفع الماء إلى " + String(seconds) + " ثانية. ";
+      addLog("تحديث زمن رفع الماء: " + String(seconds) + " ثانية");
       updated = true;
     }
   }
 
-  // إذا تم إرسال النموذج (التحقق عبر minutes)
   if (server.hasArg("minutes")) {
     bool newEnabled = server.hasArg("quietEnabled");
     if (newEnabled != quietModeEnabled) {
       quietModeEnabled = newEnabled;
       updated = true;
-      addLog(quietModeEnabled ? "تم تفعيل وقت الهدوء" : "تم إلغاء وقت الهدوء");
+      addLog(quietModeEnabled ? "تفعيل وقت الهدوء" : "إلغاء وقت الهدوء");
     }
   }
 
@@ -587,7 +583,7 @@ void handleSetTimeout() {
     if (startH >= 0 && startH <= 23 && startH != quietStartHour) {
       quietStartHour = startH;
       updated = true;
-      addLog("بدء وقت الهدوء: " + String(startH));
+      addLog("بدء وقت الهدوء: " + String(startH) + ":00");
     }
   }
 
@@ -596,16 +592,16 @@ void handleSetTimeout() {
     if (endH >= 0 && endH <= 23 && endH != quietEndHour) {
       quietEndHour = endH;
       updated = true;
-      addLog("انتهاء وقت الهدوء: " + String(endH));
+      addLog("انتهاء وقت الهدوء: " + String(endH) + ":00");
     }
   }
 
   if (updated) {
     if (statusMsg == "") {
-      statusMsg = "تم حفظ إعدادات وقت الهدوء بنجاح.";
+      statusMsg = "تم حفظ الإعدادات بنجاح";
     }
     currentStatus = statusMsg;
-    saveSettings(); // حفظ الإعدادات الجديدة في EEPROM
+    saveSettings();
   } else {
     currentStatus = "خطأ في تعديل الإعدادات";
   }
@@ -613,6 +609,7 @@ void handleSetTimeout() {
   server.sendHeader("Location", "/", true);
   server.send(303);
 }
+
 // ---------------------------------------------------------
 void setup() {
   Serial.begin(115200);
@@ -629,7 +626,7 @@ void setup() {
   pinMode(liftSensorPin, INPUT_PULLUP);
 
   digitalWrite(powerPin, HIGH); 
-  digitalWrite(relayPin, HIGH); // إيقاف الدينمو (حسب نوع المرحل لديك)
+  digitalWrite(relayPin, HIGH);
 
   // تهيئة وتزامن وقت النظام عبر الإنترنت (GMT+3)
   configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
@@ -647,9 +644,8 @@ void setup() {
 
   Serial.println("\nتم الاتصال بنجاح!");
   Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP()); // اطبع هذا الـ IP لتدخل عليه من هاتفك
+  Serial.println(WiFi.localIP());
 
-  // توجيه المتصفح לדالة handleRoot عند طلب الصفحة الرئيسية
   server.on("/", handleRoot);
   server.on("/status", handleStatus);
   server.on("/reset", handleReset);
@@ -661,133 +657,121 @@ void setup() {
   server.on("/cancel-timer", handleCancelTimer);
   server.begin();
   Serial.println("سيرفر الويب يعمل الآن...");
-  addLog("تم تشغيل النظام بنجاح");
-
+  addLog("تشغيل النظام");
 }
 
 // ---------------------------------------------------------
 void loop() {
-  // 1. الاستماع لطلبات المتصفح (هذه الدالة يجب أن تعمل دائماً بدون توقف)
+  // 1. الاستماع لطلبات المتصفح
   server.handleClient();
 
-  // 2. فحص مستوى الماء كل ثانيتين فقط (بدون إيقاف السيرفر)
+  // 2. فحص مستوى الماء كل ثانيتين
   if (millis() - lastSensorRead >= 2000) {
     lastSensorRead = millis();
 
-    // إذا كان هناك خطأ، لا تقم بشيء (تجنب تعديل النص للحفاظ على سبب المشكلة المحدد)
+    // إذا كان هناك خطأ، لا تقم بشيء للحفاظ على سبب المشكلة
     if (systemError) {
       return;
     }
 
-    // --- فحص إيقاف المضخة التلقائية عند دخول وقت الهدوء ---
+    // فحص إيقاف المضخة التلقائية عند دخول وقت الهدوء
     if (isPumping && !manualMode && isQuietHours()) {
       digitalWrite(relayPin, HIGH);
       isPumping = false;
-      currentStatus = "⏸️ تم إيقاف الدينمو تلقائياً لدخول وقت الهدوء المحظور";
-      addLog("إيقاف مؤقت: وقت الهدوء");
-      Serial.println("إيقاف مؤقت للدينمو لدخول وقت الهدوء المحظور");
+      currentStatus = "الضخ متوقف مؤقتاً (وقت الهدوء)";
+      addLog("توقف مؤقت: وقت الهدوء");
+      Serial.println("توقف الدينمو لدخول وقت الهدوء");
       return;
     }
 
-    // --- حماية الأسلاك وقراءة الحساسات ---
+    // قراءة الحساسات
     digitalWrite(powerPin, LOW);
-    delay(10); // تأخير بسيط جداً لا يؤثر على السيرفر
+    delay(10);
     int highWater = digitalRead(highSensorPin);
     int lowWater = digitalRead(lowSensorPin);
     int warningWater = digitalRead(warningSensorPin);
     int liftWater = digitalRead(liftSensorPin);
     digitalWrite(powerPin, HIGH);
 
-    // --- حماية الجفاف / كشف عدم رفع الماء (تعمل في الوضع التلقائي فقط) ---
+    // حماية الجفاف / كشف عدم رفع الماء (الوضع التلقائي فقط)
     if (isPumping && !manualMode && (millis() - pumpStartTime >= liftTimeout)) {
-      if (liftWater == HIGH) { // HIGH تعني عدم وجود ماء عند المصب
+      if (liftWater == HIGH) {
         digitalWrite(relayPin, HIGH);
         isPumping = false;
         manualTimerActive = false;
         manualMode = false;
         systemError = true;
-        currentStatus = "طوارئ: الدينمو يعمل ولكن لا يرفع ماء! تم الإيقاف لحمايته";
-        addLog("طوارئ: فشل رفع الماء");
-        Serial.println("طوارئ: فشل رفع الماء عند المصب!");
-        saveSettings(); // حفظ حالة الطوارئ لمنع التشغيل عند انقطاع الكهرباء وعودتها
+        currentStatus = "خطأ: الدينمو لا يرفع ماء - مقفل";
+        addLog("خطأ: فشل رفع الماء");
+        Serial.println("خطأ: فشل رفع الماء");
+        saveSettings();
         return;
       }
     }
 
-    // --- منطق التشغيل والإيقاف ---
+    // منطق التشغيل والإيقاف
     if (highWater == LOW) {
-      // وصل الماء للسلك العلوي → الخزان ممتلئ
+      // الخزان ممتلئ
       if (isPumping) {
         digitalWrite(relayPin, HIGH);
         isPumping = false;
         manualTimerActive = false;
         manualTimerDuration = 0;
-        if (manualMode) {
-          currentStatus = "الخزان ممتلئ - تم إيقاف الدينمو (يدوي)";
-          addLog("إيقاف يدوي - الخزان ممتلئ");
-          Serial.println("إيقاف يدوي - الخزان ممتلئ");
-        } else {
-          currentStatus = "الخزان ممتلئ - تم إيقاف الدينمو";
-          addLog("تم إيقاف الدينمو - الخزان ممتلئ");
-          Serial.println("تم إيقاف الدينمو - الخزان ممتلئ");
-        }
+        currentStatus = manualMode ? "الخزان امتلأ - توقف الضخ" : "الخزان ممتلئ";
+        addLog("توقف الضخ - الخزان ممتلئ");
+        Serial.println("توقف الضخ - الخزان ممتلئ");
       } else {
-        currentStatus = "✅ الخزان ممتلئ";
+        currentStatus = "الخزان ممتلئ";
       }
     }
     else if (lowWater == HIGH) {
-      // الماء نزل تحت السلك السفلي → تشغيل تلقائي
+      // مستوى حرج
       if (!isPumping && !manualMode) {
         if (isQuietHours()) {
-          currentStatus = "⏸️ مستوى حرج - تم تأجيل التشغيل لوجود وقت الهدوء المحظور";
+          currentStatus = "مستوى حرج - مؤجل (وقت الهدوء)";
         } else {
           digitalWrite(relayPin, LOW);
           isPumping = true;
           pumpStartTime = millis();
-          currentStatus = "🔴 مستوى حرج - تم تشغيل الدينمو تلقائياً";
-          addLog("تم تشغيل الدينمو - مستوى حرج");
-          Serial.println("تم تشغيل الدينمو - مستوى حرج");
+          currentStatus = "جاري الضخ تلقائياً";
+          addLog("بدء الضخ تلقائياً");
+          Serial.println("بدء الضخ تلقائياً");
         }
       } else if (isPumping) {
-        if (manualMode) currentStatus = "🖐 يدوي - جاري التعبئة | المستوى حرج";
-        else currentStatus = "⚡ جاري التعبئة | المستوى حرج";
+        currentStatus = manualMode ? "جاري الضخ يدوياً" : "جاري الضخ تلقائياً";
       } else if (manualMode) {
-        currentStatus = "🔴 المستوى حرج - قم بتشغيل الدينمو";
+        currentStatus = "مستوى حرج - شغل الدينمو";
       }
     }
     else if (warningWater == HIGH) {
-      // الماء نزل تحت سلك التحذير → مستوى منخفض
       if (isPumping) {
-        if (manualMode) currentStatus = "🖐 يدوي - جاري التعبئة | المستوى منخفض";
-        else currentStatus = "⚡ جاري التعبئة | المستوى منخفض";
+        currentStatus = manualMode ? "جاري الضخ يدوياً" : "جاري الضخ تلقائياً";
       } else {
-        currentStatus = "⚠️ تحذير: مستوى الماء منخفض";
+        currentStatus = "تحذير: مستوى الماء منخفض";
       }
     } else {
-      // الماء بين السلك السفلي وسلك التحذير → مستوى طبيعي
       if (isPumping) {
-        if (manualMode) currentStatus = "🖐 يدوي - جاري التعبئة | المستوى متوسط";
-        else currentStatus = "⚡ جاري التعبئة | المستوى متوسط";
+        currentStatus = manualMode ? "جاري الضخ يدوياً" : "جاري الضخ تلقائياً";
       } else {
-        currentStatus = "✅ المستوى طبيعي";
+        currentStatus = "مستوى الماء طبيعي";
       }
     }
   }
 
-  // --- 3. تايمر الوضع اليدوي (يتوقف عند انتهاء الوقت المحدد) ---
+  // 3. تايمر الوضع اليدوي
   if (isPumping && manualTimerActive && !systemError) {
     if (millis() - pumpStartTime >= manualTimerDuration) {
       digitalWrite(relayPin, HIGH);
       isPumping = false;
       manualTimerActive = false;
       manualTimerDuration = 0;
-      currentStatus = "✅ انتهى تايمر الوضع اليدوي - تم إيقاف الدينمو";
-      addLog("انتهى التايمر اليدوي - تم الإيقاف التلقائي");
-      Serial.println("انتهى التايمر اليدوي - تم الإيقاف التلقائي");
+      currentStatus = "تم الإيقاف - انتهى وقت التايمر";
+      addLog("انتهاء وقت التايمر");
+      Serial.println("انتهاء وقت التايمر");
     }
   }
 
-  // -غ4. مؤقت الأمان (حارس النظام - يعمل في الوضع التلقائي فقط) ---
+  // 4. مؤقت الأمان الأقصى (الوضع التلقائي فقط)
   if (isPumping && !manualMode && !systemError) {
     if (millis() - pumpStartTime >= maxPumpTime) {
       digitalWrite(relayPin, HIGH);
@@ -795,17 +779,17 @@ void loop() {
       manualTimerActive = false;
       manualMode = false;
       systemError = true;
-      currentStatus = "طوارئ: تجاوز الوقت الآمن - النظام مقفل";
-      addLog("طوارئ: إيقاف الدينمو لحمايته!");
-      Serial.println("طوارئ: إيقاف الدينمو لحمايته!");
-      saveSettings(); // حفظ حالة الطوارئ لمنع التشغيل عند انقطاع الكهرباء وعودتها
+      currentStatus = "خطأ: تجاوز الوقت الأقصى - مقفل";
+      addLog("خطأ: تجاوز وقت الطوارئ");
+      Serial.println("خطأ: تجاوز وقت الطوارئ");
+      saveSettings();
     }
   }
   
-  // --- 4. فحص اتصال الواي فاي ---
+  // 5. فحص اتصال الواي فاي
   if (WiFi.status() != WL_CONNECTED) {
     static unsigned long lastReconnectAttempt = 0;
-    if (millis() - lastReconnectAttempt >= 30000) { // محاولة إعادة الاتصال كل 30 ثانية
+    if (millis() - lastReconnectAttempt >= 30000) {
       lastReconnectAttempt = millis();
       Serial.println("محاولة إعادة الاتصال بالواي فاي...");
       WiFi.reconnect();
