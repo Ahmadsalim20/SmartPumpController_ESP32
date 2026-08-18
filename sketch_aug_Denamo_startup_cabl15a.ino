@@ -1,6 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <time.h>
+#include <EEPROM.h>
 
 // --- إعدادات الواي فاي ---
 const char* ssid = "LINK";         // اسم شبكة الواي فاي
@@ -45,6 +46,47 @@ unsigned long manualTimerDuration = 0; // مدة التايمر اليدوي ب�
 void addLog(String message) {
   operationLog[logIndex] = message;
   logIndex = (logIndex + 1) % 10;
+}
+
+// دالة حفظ الإعدادات والأوضاع في الذاكرة الدائمة
+void saveSettings() {
+  byte magic = 0xAA;
+  EEPROM.put(0, magic);
+  EEPROM.put(1, manualMode);
+  EEPROM.put(2, quietModeEnabled);
+  EEPROM.put(3, systemError);
+  EEPROM.put(4, maxPumpTime);
+  EEPROM.put(8, liftTimeout);
+  EEPROM.put(12, quietStartHour);
+  EEPROM.put(16, quietEndHour);
+  EEPROM.commit();
+  Serial.println("تم حفظ الإعدادات في الذاكرة الدائمة EEPROM.");
+}
+
+// دالة تحميل الإعدادات والأوضاع من الذاكرة الدائمة
+void loadSettings() {
+  EEPROM.begin(512);
+  byte magic;
+  EEPROM.get(0, magic);
+  if (magic == 0xAA) {
+    EEPROM.get(1, manualMode);
+    EEPROM.get(2, quietModeEnabled);
+    EEPROM.get(3, systemError);
+    EEPROM.get(4, maxPumpTime);
+    EEPROM.get(8, liftTimeout);
+    EEPROM.get(12, quietStartHour);
+    EEPROM.get(16, quietEndHour);
+    Serial.println("تم تحميل الإعدادات من الذاكرة الدائمة EEPROM بنجاح.");
+    
+    // في حال تم تحميل نظام به خطأ طوارئ، نحدث الحالة المعروضة
+    if (systemError) {
+      currentStatus = "طوارئ: تم استعادة حالة الإقفال للحماية (انقطاع الكهرباء أثناء الخطأ)";
+      addLog("طوارئ: استعادة الإقفال");
+    }
+  } else {
+    Serial.println("لم يتم العثور على إعدادات مخزنة. سيتم حفظ القيم الافتراضية.");
+    saveSettings(); // حفظ القيم الافتراضية للمرة الأولى
+  }
 }
 
 // دالة التحقق مما إذا كنا في وقت الهدوء المحظور للتشغيل التلقائي
@@ -418,6 +460,7 @@ void handleReset() {
   digitalWrite(relayPin, HIGH); // التأكد من إطفاء الدينمو للأمان
   currentStatus = "تم إعادة ضبط النظام";
   addLog("تم إعادة ضبط النظام");
+  saveSettings(); // حفظ التغييرات في EEPROM
   
   server.sendHeader("Location", "/", true);
   server.send(303);
@@ -429,6 +472,7 @@ void handleToggleMode() {
     manualMode = !manualMode;
     currentStatus = manualMode ? "تم التبديل للوضع اليدوي" : "تم التبديل للوضع التلقائي";
     addLog(manualMode ? "تبديل للوضع اليدوي" : "تبديل للوضع التلقائي");
+    saveSettings(); // حفظ الوضع الجديد
   }
   server.sendHeader("Location", "/", true);
   server.send(303);
@@ -448,6 +492,7 @@ void handleManualOn() {
     manualTimerDuration = 0;
     currentStatus = "🖐 تشغيل يدوي - جاري التعبئة";
     addLog("تم التشغيل اليدوي للدينمو");
+    saveSettings(); // حفظ الوضع اليدوي
   }
   server.sendHeader("Location", "/", true);
   server.send(303);
@@ -472,6 +517,7 @@ void handleSetManualTimer() {
     currentStatus = "⏱ تايمر يدوي: " + String(requestedMin) + " دقيقة";
     addLog("تايمر يدوي: " + String(requestedMin) + " دقيقة");
     Serial.println("تايمر يدوي: " + String(requestedMin) + " دقيقة");
+    saveSettings(); // حفظ الوضع اليدوي
   }
   server.sendHeader("Location", "/", true);
   server.send(303);
@@ -559,6 +605,7 @@ void handleSetTimeout() {
       statusMsg = "تم حفظ إعدادات وقت الهدوء بنجاح.";
     }
     currentStatus = statusMsg;
+    saveSettings(); // حفظ الإعدادات الجديدة في EEPROM
   } else {
     currentStatus = "خطأ في تعديل الإعدادات";
   }
@@ -569,6 +616,9 @@ void handleSetTimeout() {
 // ---------------------------------------------------------
 void setup() {
   Serial.begin(115200);
+
+  // تحميل الإعدادات المحفوظة من EEPROM
+  loadSettings();
 
   // إعداد المنافذ
   pinMode(relayPin, OUTPUT);
@@ -659,6 +709,7 @@ void loop() {
         currentStatus = "طوارئ: الدينمو يعمل ولكن لا يرفع ماء! تم الإيقاف لحمايته";
         addLog("طوارئ: فشل رفع الماء");
         Serial.println("طوارئ: فشل رفع الماء عند المصب!");
+        saveSettings(); // حفظ حالة الطوارئ لمنع التشغيل عند انقطاع الكهرباء وعودتها
         return;
       }
     }
@@ -747,6 +798,7 @@ void loop() {
       currentStatus = "طوارئ: تجاوز الوقت الآمن - النظام مقفل";
       addLog("طوارئ: إيقاف الدينمو لحمايته!");
       Serial.println("طوارئ: إيقاف الدينمو لحمايته!");
+      saveSettings(); // حفظ حالة الطوارئ لمنع التشغيل عند انقطاع الكهرباء وعودتها
     }
   }
   
