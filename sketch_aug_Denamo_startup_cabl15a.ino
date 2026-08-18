@@ -550,15 +550,6 @@ void loop() {
         currentStatus = "✅ الخزان ممتلئ";
       }
     }
-    else if (warningWater == HIGH) {
-      // الماء نزل تحت سلك التحذير → مستوى منخفض
-      if (isPumping) {
-        if (manualMode) currentStatus = "🖐 يدوي - جاري التعبئة | المستوى منخفض";
-        else currentStatus = "⚡ جاري التعبئة | المستوى منخفض";
-      } else {
-        currentStatus = "⚠️ تحذير: مستوى الماء منخفض";
-      }
-    }
     else if (lowWater == HIGH) {
       // الماء نزل تحت السلك السفلي → تشغيل تلقائي
       if (!isPumping && !manualMode) {
@@ -573,6 +564,15 @@ void loop() {
         else currentStatus = "⚡ جاري التعبئة | المستوى حرج";
       } else if (manualMode) {
         currentStatus = "🔴 المستوى حرج - قم بتشغيل الدينمو";
+      }
+    }
+    else if (warningWater == HIGH) {
+      // الماء نزل تحت سلك التحذير → مستوى منخفض
+      if (isPumping) {
+        if (manualMode) currentStatus = "🖐 يدوي - جاري التعبئة | المستوى منخفض";
+        else currentStatus = "⚡ جاري التعبئة | المستوى منخفض";
+      } else {
+        currentStatus = "⚠️ تحذير: مستوى الماء منخفض";
       }
     } else {
       // الماء بين السلك السفلي وسلك التحذير → مستوى طبيعي
