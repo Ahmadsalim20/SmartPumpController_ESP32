@@ -3,9 +3,12 @@
 #include <time.h>
 #include <EEPROM.h>
 
-// --- إعدادات الواي فاي ---
-const char* ssid = "LINK";         // اسم شبكة الواي فاي
-const char* password = "774860879AA"; // كلمة مرور الواي فاي
+// --- إعدادات الواي فاي (نقطة بث AP + الاتصال بالراوتر STA) ---
+String wifiSSID = "";        // اسم شبكة الواي فاي المنزلية المحفوظة
+String wifiPassword = "";    // كلمة مرور شبكة الواي فاي المنزلية
+
+const char* apSSID = "SmartPump-Setup"; // اسم شبكة البث الخاصة بالمتحكم
+const char* apPassword = "";            // كلمة مرور البث (مفتوحة لسهولة الاتصال)
 
 // إنشاء كائن السيرفر على البورت 80
 ESP8266WebServer server(80);
@@ -48,6 +51,26 @@ void addLog(String message) {
   logIndex = (logIndex + 1) % 10;
 }
 
+// --- دوال التعامل مع النصوص في الذاكرة الدائمة EEPROM ---
+void writeEEPROMString(int addr, String str, int maxLen) {
+  int len = str.length();
+  if (len >= maxLen) len = maxLen - 1;
+  for (int i = 0; i < len; i++) {
+    EEPROM.write(addr + i, str[i]);
+  }
+  EEPROM.write(addr + len, '\0');
+}
+
+String readEEPROMString(int addr, int maxLen) {
+  String str = "";
+  for (int i = 0; i < maxLen; i++) {
+    char c = EEPROM.read(addr + i);
+    if (c == '\0' || c == (char)0xFF) break;
+    str += c;
+  }
+  return str;
+}
+
 // دالة حفظ الإعدادات والأوضاع في الذاكرة الدائمة
 void saveSettings() {
   byte magic = 0xAA;
@@ -59,8 +82,10 @@ void saveSettings() {
   EEPROM.put(8, liftTimeout);
   EEPROM.put(12, quietStartHour);
   EEPROM.put(16, quietEndHour);
+  writeEEPROMString(20, wifiSSID, 32);
+  writeEEPROMString(52, wifiPassword, 64);
   EEPROM.commit();
-  Serial.println("تم حفظ الإعدادات في الذاكرة الدائمة EEPROM.");
+  Serial.println("تم حفظ الإعدادات والواي فاي في الذاكرة الدائمة EEPROM.");
 }
 
 // دالة تحميل الإعدادات والأوضاع من الذاكرة الدائمة
@@ -76,9 +101,10 @@ void loadSettings() {
     EEPROM.get(8, liftTimeout);
     EEPROM.get(12, quietStartHour);
     EEPROM.get(16, quietEndHour);
+    wifiSSID = readEEPROMString(20, 32);
+    wifiPassword = readEEPROMString(52, 64);
     Serial.println("تم تحميل الإعدادات من الذاكرة الدائمة EEPROM بنجاح.");
     
-    // في حال تم تحميل نظام به خطأ طوارئ، نحدث الحالة المعروضة
     if (systemError) {
       currentStatus = "طوارئ: تم استعادة حالة الإقفال للحماية (انقطاع الكهرباء أثناء الخطأ)";
       addLog("طوارئ: استعادة الإقفال");
@@ -95,7 +121,6 @@ bool isQuietHours() {
   
   time_t now = time(nullptr);
   if (now < 1000000000ULL) {
-    // لم يتم مزامنة الوقت بعد من الإنترنت
     return false; 
   }
   
@@ -129,7 +154,7 @@ void handleRoot() {
 
   String html = "<!DOCTYPE html><html lang='ar' dir='rtl'>";
   html += "<head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=no'>";
-  html += "<title>نظام الخزان</title><style>";
+  html += "<title>SmartPump Controller</title><style>";
 
   // نظام الألوان
   html += ":root{--blue:#1a56db;--blue-dk:#1343b5;--blue-lt:#e8effd;";
@@ -204,7 +229,7 @@ void handleRoot() {
   html += ".btn.red{background:var(--red);color:white;}.btn.red:hover{background:#c92a2a;}";
   html += ".btn.ghost{background:var(--g50);color:var(--g600);border:1.5px solid var(--g200);}.btn.ghost:hover{background:var(--g200);}";
   html += ".btn.amber{background:var(--amber);color:white;}.btn.amber:hover{background:#d46b08;}";
-  html += ".btn.full{grid-column:1/-1;}";
+  html += ".btn.full{grid-column:1/-1;width:100%;}";
 
   // تايمر
   html += ".tmr{background:var(--blue-lt);border:1.5px solid #c1d4f7;border-radius:var(--rs);padding:12px;}";
@@ -230,16 +255,16 @@ void handleRoot() {
   html += ".set-section{margin-bottom:14px;}";
   html += ".set-title{font-size:10px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;";
   html += "padding-bottom:5px;border-bottom:1.5px solid var(--blue-lt);margin-bottom:9px;}";
-  html += ".set-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0;}";
+  html += ".set-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;}";
   html += ".set-lbl{font-size:13px;color:var(--g600);font-weight:600;}";
-  html += ".set-inp{width:70px;padding:7px;border:1.5px solid var(--g200);border-radius:var(--rs);font-size:13px;text-align:center;outline:none;}";
+  html += ".set-inp{width:80px;padding:7px;border:1.5px solid var(--g200);border-radius:var(--rs);font-size:13px;text-align:center;outline:none;}";
   html += ".set-inp:focus{border-color:var(--blue);}";
   html += ".set-hint{font-size:10px;color:var(--g400);text-align:center;margin-top:6px;}";
 
   html += "</style></head><body><div class='page'>";
 
-  // رأس
-  html += "<div class='hdr'><div class='hdr-title'>نظام الخزان</div>";
+  // رأس الصفحة
+  html += "<div class='hdr'><div class='hdr-title'>متحكم مضخة المياه الذكي</div>";
   html += "<div class='hdr-time' id='sysTimeLabel'>" + sysTime + "</div></div>";
 
   // شريط الوضع مع السوتش
@@ -338,8 +363,29 @@ void handleRoot() {
 
   // الإعدادات
   html += "<div id='setPane' class='tab-pane'>";
-  html += "<form action='/set-timeout' method='GET'>";
 
+  // قسم إضافة / إعداد شبكة الواي فاي
+  html += "<div class='set-section'>";
+  html += "<div class='set-title'>إعداد شبكة الواي فاي (Wi-Fi)</div>";
+  if (WiFi.status() == WL_CONNECTED) {
+    html += "<div style='font-size:12px;color:var(--green);font-weight:700;margin-bottom:8px;'>متصل حالياً بـ: " + wifiSSID + " (" + WiFi.localIP().toString() + ")</div>";
+  } else {
+    html += "<div style='font-size:12px;color:var(--amber);font-weight:700;margin-bottom:8px;'>يعمل بنقطة البث المباشر (SmartPump-Setup)</div>";
+  }
+  html += "<form action='/set-wifi' method='GET'>";
+  html += "<div class='set-row'><span class='set-lbl'>اسم الشبكة (SSID)</span>";
+  html += "<input type='text' name='ssid' class='set-inp' style='width:140px;text-align:right' value='" + wifiSSID + "' placeholder='اسم الشبكة' required></div>";
+  html += "<div class='set-row'><span class='set-lbl'>كلمة المرور</span>";
+  html += "<input type='password' name='password' class='set-inp' style='width:140px;text-align:right' placeholder='كلمة المرور'></div>";
+  html += "<button type='submit' class='btn blue full' style='margin-top:6px'>حفظ والاتصال بالشبكة</button>";
+  html += "</form>";
+  if (wifiSSID.length() > 0) {
+    html += "<a href='/forget-wifi' class='btn ghost full' style='margin-top:6px;color:var(--red)'>مسح الشبكة المحفوظة</a>";
+  }
+  html += "</div>";
+
+  // قسم إعدادات حماية المضخة ووقت الهدوء
+  html += "<form action='/set-timeout' method='GET'>";
   html += "<div class='set-section'>";
   html += "<div class='set-title'>حماية المضخة</div>";
   html += "<div class='set-row'><span class='set-lbl'>وقت الطوارئ (دقائق)</span>";
@@ -358,7 +404,7 @@ void handleRoot() {
   html += "<input type='number' name='quietEnd' class='set-inp' min='0' max='23' value='" + String(quietEndHour) + "'></div>";
   html += "</div>";
 
-  html += "<button type='submit' class='btn blue full' style='margin-top:4px'>حفظ الإعدادات</button>";
+  html += "<button type='submit' class='btn blue full' style='margin-top:4px'>حفظ إعدادات النظام</button>";
   html += "<div class='set-hint'>الطوارئ: 1-300 دقيقة &nbsp;|&nbsp; الرفع: 1-300 ثانية &nbsp;|&nbsp; الهدوء: 0-23</div>";
   html += "</form></div>";
 
@@ -544,6 +590,35 @@ void handleManualOff() {
   server.send(303);
 }
 
+// دالة تحديث بيانات شبكة الواي فاي
+void handleSetWiFi() {
+  if (server.hasArg("ssid")) {
+    wifiSSID = server.arg("ssid");
+    wifiSSID.trim();
+    wifiPassword = server.arg("password");
+    saveSettings();
+    addLog("حفظ واي فاي: " + wifiSSID);
+    currentStatus = "جاري الاتصال بـ " + wifiSSID + "...";
+    
+    WiFi.disconnect();
+    WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
+  }
+  server.sendHeader("Location", "/", true);
+  server.send(303);
+}
+
+// دالة مسح شبكة الواي فاي المحفوظة
+void handleForgetWiFi() {
+  wifiSSID = "";
+  wifiPassword = "";
+  saveSettings();
+  WiFi.disconnect();
+  currentStatus = "تم مسح شبكة الواي فاي المحفوظة";
+  addLog("مسح شبكة الواي فاي");
+  server.sendHeader("Location", "/", true);
+  server.send(303);
+}
+
 // دالة تحديث وقت الطوارئ وزمن كشف رفع الماء ووقت الهدوء
 void handleSetTimeout() {
   bool updated = false;
@@ -631,20 +706,41 @@ void setup() {
   // تهيئة وتزامن وقت النظام عبر الإنترنت (GMT+3)
   configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
 
-  // الاتصال بالواي فاي
-  Serial.println();
-  Serial.print("جاري الاتصال بـ ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password);
+  // تفعيل الوضع المزدوج للواي فاي (نقطة بث AP + الاتصال بالراوتر STA)
+  WiFi.mode(WIFI_AP_STA);
+  
+  // تشغيل شبكة البث المباشر المفتوحة للمتحكم
+  WiFi.softAP(apSSID, apPassword);
+  Serial.print("تم تشغيل نقطة البث الخاصة بالمتحكم (AP): ");
+  Serial.println(apSSID);
+  Serial.print("IP نقطة البث المباشر: ");
+  Serial.println(WiFi.softAPIP());
 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  // في حال وجود شبكة واي فاي منزلية محفوظة، نحاول الاتصال بها
+  if (wifiSSID.length() > 0) {
+    Serial.print("جاري محاولة الاتصال بشبكة: ");
+    Serial.println(wifiSSID);
+    WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
+
+    unsigned long startAttempt = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < 10000) {
+      delay(500);
+      Serial.print(".");
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("\nتم الاتصال بالواي فاي بنجاح!");
+      Serial.print("IP Address (Station): ");
+      Serial.println(WiFi.localIP());
+      addLog("اتصال بالواي فاي: " + wifiSSID);
+    } else {
+      Serial.println("\nتعذر الاتصال بالشبكة المحفوظة. يعمل بالنقطة المباشرة AP فقط.");
+      addLog("تعذر الاتصال بالواي فاي");
+    }
+  } else {
+    Serial.println("لم تكتشف شبكة واي فاي محفوظة. اتصل بـ SmartPump-Setup لإدخال الواي فاي.");
+    addLog("تشغيل نقطة البث AP");
   }
-
-  Serial.println("\nتم الاتصال بنجاح!");
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
 
   server.on("/", handleRoot);
   server.on("/status", handleStatus);
@@ -655,6 +751,8 @@ void setup() {
   server.on("/set-timeout", handleSetTimeout);
   server.on("/set-manual-timer", handleSetManualTimer);
   server.on("/cancel-timer", handleCancelTimer);
+  server.on("/set-wifi", handleSetWiFi);
+  server.on("/forget-wifi", handleForgetWiFi);
   server.begin();
   Serial.println("سيرفر الويب يعمل الآن...");
   addLog("تشغيل النظام");
@@ -786,14 +884,13 @@ void loop() {
     }
   }
   
-  // 5. فحص اتصال الواي فاي
-  if (WiFi.status() != WL_CONNECTED) {
+  // 5. محاولة إعادة الاتصال بالواي فاي إذا وُجدت وغير متصل
+  if (wifiSSID.length() > 0 && WiFi.status() != WL_CONNECTED) {
     static unsigned long lastReconnectAttempt = 0;
     if (millis() - lastReconnectAttempt >= 30000) {
       lastReconnectAttempt = millis();
       Serial.println("محاولة إعادة الاتصال بالواي فاي...");
-      WiFi.reconnect();
-      addLog("محاولة إعادة الاتصال بالواي فاي");
+      WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
     }
   }
 }
