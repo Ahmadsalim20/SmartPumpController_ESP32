@@ -14,6 +14,7 @@ const int highSensorPin = 4;  // D2: السلك العلوي (نقطة الإي�
 const int lowSensorPin = 14;  // D5: السلك السفلي (نقطة التشغيل)
 const int warningSensorPin = 12; // D6: سلك التحذير (قبل النفاد)
 const int powerPin = 0;       // D3: سلك الطاقة في القاع
+const int liftSensorPin = 13; // D7: سلك كشف رفع الماء (عند مصب الأنبوب)
 
 // --- متغيرات حالة النظام ---
 bool isPumping = false; 
@@ -27,6 +28,7 @@ int logIndex = 0;
 unsigned long pumpStartTime = 0; 
 unsigned long maxPumpTime = 60000UL; // وقت الطوارئ (بالميلي ثانية) - قابل للتعديل من الويب (افتراضي دقيقة واحدة)
 const unsigned long maxAllowedTime = 300000UL; // 300 دقيقة (5 ساعات) كحد أقصى (للحماية)
+const unsigned long liftTimeout = 15000UL; // فترة سماح كشف رفع الماء (15 ثانية)
 unsigned long lastSensorRead = 0;            // متى كانت آخر قراءة للحساس؟
 
 // --- تايمر الوضع اليدوي ---
@@ -459,6 +461,7 @@ void setup() {
   pinMode(highSensorPin, INPUT_PULLUP);
   pinMode(lowSensorPin, INPUT_PULLUP);
   pinMode(warningSensorPin, INPUT_PULLUP);
+  pinMode(liftSensorPin, INPUT_PULLUP);
 
   digitalWrite(powerPin, HIGH); 
   digitalWrite(relayPin, HIGH); // إيقاف الدينمو (حسب نوع المرحل لديك)
@@ -503,9 +506,8 @@ void loop() {
   if (millis() - lastSensorRead >= 2000) {
     lastSensorRead = millis();
 
-    // إذا كان هناك خطأ، لا تقم بشيء سوى تحديث النص
+    // إذا كان هناك خطأ، لا تقم بشيء (تجنب تعديل النص للحفاظ على سبب المشكلة المحدد)
     if (systemError) {
-      currentStatus = "طوارئ: تجاوز الوقت الآمن - النظام مقفل";
       return;
     }
 
@@ -515,7 +517,23 @@ void loop() {
     int highWater = digitalRead(highSensorPin);
     int lowWater = digitalRead(lowSensorPin);
     int warningWater = digitalRead(warningSensorPin);
+    int liftWater = digitalRead(liftSensorPin);
     digitalWrite(powerPin, HIGH);
+
+    // --- حماية الجفاف / كشف عدم رفع الماء ---
+    if (isPumping && (millis() - pumpStartTime >= liftTimeout)) {
+      if (liftWater == HIGH) { // HIGH تعني عدم وجود ماء عند المصب
+        digitalWrite(relayPin, HIGH);
+        isPumping = false;
+        manualTimerActive = false;
+        manualMode = false;
+        systemError = true;
+        currentStatus = "طوارئ: الدينمو يعمل ولكن لا يرفع ماء! تم الإيقاف لحمايته";
+        addLog("طوارئ: فشل رفع الماء");
+        Serial.println("طوارئ: فشل رفع الماء عند المصب!");
+        return;
+      }
+    }
 
     // --- منطق التشغيل والإيقاف ---
     if (highWater == LOW) {
