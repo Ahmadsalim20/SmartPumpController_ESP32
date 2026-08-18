@@ -1,86 +1,86 @@
-# 🚰 SmartPump Controller | متحكم مضخة المياه الذكي
+# 🚰 SmartPump Controller
 
-نظام كهروميكانيكي ذكي مخصص للتحكم بمضخات المياه (الدينمو) ومراقبة مستويات الخزان باستخدام شريحة **ESP8266** وواجهة تحكم ويب تفاعلية ومتجاوبة باللغة العربية.
-
----
-
-## 🌟 الميزات الرئيسية (Features)
-
-* **📶 الإتصال المباشر ومدير شبكات الواي فاي (WiFi Access Point & Config Manager):**
-  * ينشئ المتحكم تلقائياً شبكة بث واي فاي خاصة باسم: **`SmartPump-Setup`** بدون كلمة سر لسهولة الاتصال المباشر بها عبر الجوال أو الكمبيوتر (على العنوان `192.168.4.1`).
-  * يتيح للمستخدم إدخال اسم وكلمة مرور شبكته المنزلية (Wi-Fi) عبر واجهة الويب مباشرة، ويتم حفظها بالذاكرة الدائمة **EEPROM**.
-  * يتصل النظام تلقائياً بالشبكة المنزلية فور ضبطها مع البقاء متاحاً عبر الاتصال المباشر.
-
-* **🤖 التشغيل التلقائي واليدوي (Auto & Manual Modes):**
-  * **الوضع التلقائي:** تشغيل الدينمو تلقائياً عند انخفاض الماء لمستوى حرج وإيقافه فور امتلاء الخزان.
-  * **الوضع اليدوي:** تحكم كامل ومباشر بتشغيل وإيقاف الدينمو عبر واجهة الويب.
-
-* **🛡️ منظومة حماية وأمان متقدمة:**
-  * **حماية كشف رفع الماء (Dry-Run Protection):** التأكد من وصول الماء لمصب الأنبوب خلال مهلة محددة (افتراضياً 15 ثانية). في حال عدم رفع الماء، يتوقف النظام فوراً ويدخل في وضع الإقفال الطارئ لحماية المضخة من الاحتراق.
-  * **مؤقت الطوارئ الأقصى (Max Runtime Timeout):** إيقاف المضخة تلقائياً والقفل بوضع الخطأ إذا تجاوز وقت الضخ التلقائي الحد المسموح (من 1 إلى 300 دقيقة).
-  * **حماية من انقطاع الكهرباء:** تخزين حالة الإقفال وإعدادات الواي فاي في ذاكرة **EEPROM** الدائمة لمنع إعادة التشغيل الخاطئ عند عودة التيار الكهربائي.
-
-* **🌙 وقت الهدوء المحظور (Quiet Hours):**
-  * إمكانية تحديد ساعات محظورة (مثل من 10 مساءً إلى 6 صباحاً) لتأجيل الضخ التلقائي وعدم إزعاج القاطنين، مع مزامنة الوقت تلقائياً عبر الإنترنت (NTP GMT+3).
-
-* **⏱️ تايمر الإيقاف اليدوي:**
-  * ميزة ضبط مؤقت تنازلي بالدقائق لإيقاف الضخ اليدوي تلقائياً بعد انقضاء المدة.
-
-* **📱 واجهة ويب متجاوبة وسريعة (Web UI & Real-time Status):**
-  * تصميم عالي الجودة يدعم الهواتف الذكية والأجهزة المختلفة.
-  * تحديث لحظي للبيانات (AJAX) دون الحاجة لإعادة تحميل الصفحة.
-  * عرض سجل لأحدث 10 عمليات بالنظام.
-  * تبويب إعدادات مرن لتسجيل شبكة الواي فاي، وتعديل أوقات الطوارئ، وقت الهدوء، ومهلة رفع الماء مباشرة من المتصفح.
+An intelligent electromechanical system designed for controlling water pumps (dynamos) and monitoring water tank levels using an **ESP8266** microcontroller with a responsive, interactive web control interface.
 
 ---
 
-## 🔌 توصيل المنافذ والدبابيس (Pinouts & Hardware Connections)
+## 🌟 Key Features
 
-| الدبوس في ESP8266 | الدبوس المبرمج | الوظيفة / الحساس | الملاحظات |
+* **📶 WiFi Access Point & Network Config Manager:**
+  * Automatically creates a dedicated Wi-Fi Access Point named **`SmartPump-Setup`** (open network, no password required) for direct connection via smartphone or computer at `http://192.168.4.1`.
+  * Allows users to input home Wi-Fi network credentials directly via the web interface, saving them to persistent **EEPROM** memory.
+  * Automatically connects to the configured home network upon reboot while remaining available for direct AP setup.
+
+* **🤖 Automatic & Manual Modes:**
+  * **Auto Mode:** Automatically starts the pump when water drops to a critical level and stops immediately once the tank is full.
+  * **Manual Mode:** Provides full direct control to turn the pump on or off via the web interface.
+
+* **🛡️ Advanced Safety & Protection System:**
+  * **Dry-Run Protection (Water Lift Detection):** Verifies that water reaches the outlet pipe within a configured grace period (default: 15 seconds). If no water lift is detected, the system immediately shuts down and enters an emergency lock state to prevent pump burnout.
+  * **Max Runtime Timeout:** Automatically turns off the pump and enters error state if automatic pumping exceeds the maximum allowed duration (configurable from 1 to 300 minutes).
+  * **Power Interruption Protection:** Stores error lock states and Wi-Fi configurations in non-volatile **EEPROM** to prevent unsafe auto-restarts upon power recovery.
+
+* **🌙 Quiet Hours:**
+  * Allows setting prohibited pumping hours (e.g., 10:00 PM to 6:00 AM) to suppress automatic pumping during quiet periods, with automated time synchronization via internet NTP (GMT+3).
+
+* **⏱️ Manual Shutdown Timer:**
+  * Option to set a countdown timer in minutes for manual pumping, automatically shutting off the pump when expired.
+
+* **📱 Responsive & Real-time Web UI:**
+  * High-quality responsive design optimized for mobile phones, tablets, and desktop browsers.
+  * Real-time status updates via AJAX without requiring page reloads.
+  * System event log displaying the latest 10 operational events.
+  * Flexible Settings tab to configure Wi-Fi credentials, emergency timeouts, quiet hours, and lift detection limits directly from the browser.
+
+---
+
+## 🔌 Pinouts & Hardware Connections
+
+| ESP8266 Pin | Programmed GPIO | Function / Sensor | Description |
 | :--- | :--- | :--- | :--- |
-| **D1** | `GPIO 5` | ريليه الدينمو (`relayPin`) | التحكم بتشغيل وإيقاف المضخة |
-| **D2** | `GPIO 4` | حساس الخزان العلوي (`highSensorPin`) | نقطة إيقاف الضخ (الخزان ممتلئ) |
-| **D5** | `GPIO 14` | حساس الخزان السفلي (`lowSensorPin`) | نقطة بداية الضخ (مستوى حرج) |
-| **D6** | `GPIO 12` | حساس التحذير (`warningSensorPin`) | التنبيه قبل نفاد الماء |
-| **D7** | `GPIO 13` | حساس رفع الماء (`liftSensorPin`) | عند مصب الأنبوب للكشف عن مرور الماء |
-| **D3** | `GPIO 0` | سلك تغذية الحساسات (`powerPin`) | نبضات طاقة للحساسات لمنع التآكل الكيميائي |
+| **D1** | `GPIO 5` | Pump Relay (`relayPin`) | Controls pump activation / shutdown |
+| **D2** | `GPIO 4` | High Level Sensor (`highSensorPin`) | Pumping stop point (Tank Full) |
+| **D5** | `GPIO 14` | Low Level Sensor (`lowSensorPin`) | Pumping start point (Critical Low) |
+| **D6** | `GPIO 12` | Warning Sensor (`warningSensorPin`) | Early notification before water depletes |
+| **D7** | `GPIO 13` | Water Lift Sensor (`liftSensorPin`) | Positioned at pipe outlet to verify water flow |
+| **D3** | `GPIO 0` | Sensor Power Supply (`powerPin`) | Pulsed power supply to sensors to prevent chemical electrolysis |
 
 ---
 
-## 🌐 مسارات الويب وواجهة برمجة التطبيقات (API Endpoints)
+## 🌐 Web Routes & API Endpoints
 
-| المسار (Endpoint) | الطريقة (Method) | الوصف |
+| Endpoint | Method | Description |
 | :--- | :--- | :--- |
-| `/` | `GET` | واجهة المستخدم الرئيسية (HTML / CSS / JS) |
-| `/status` | `GET` | استرجاع حالة النظام، مؤقت التشغيل، والسجلات بصيغة `JSON` |
-| `/set-wifi` | `GET` | حفظ اسم وكلمة مرور شبكة الواي فاي بالذاكرة (`?ssid=X&password=Y`) |
-| `/forget-wifi` | `GET` | مسح شبكة الواي فاي المحفوظة بالذاكرة |
-| `/toggle-mode` | `GET` | التبديل بين الوضع التلقائي واليدوي |
-| `/manual-on` | `GET` | تشغيل الدينمو يدوياً |
-| `/manual-off` | `GET` | إيقاف الدينمو يدوياً |
-| `/set-manual-timer` | `GET` | تفعيل تايمر يدوي (`?min=X`) |
-| `/cancel-timer` | `GET` | إلغاء التايمر اليدوي |
-| `/set-timeout` | `GET` | ضبط إعدادات الطوارئ، كشف الرفع، وساعات الهدوء |
-| `/reset` | `GET` | إعادة ضبط الخطأ وتصفير النظام |
+| `/` | `GET` | Main Web Interface (HTML / CSS / JS) |
+| `/status` | `GET` | Fetches system state, runtime timers, and recent event logs in `JSON` format |
+| `/set-wifi` | `GET` | Saves Wi-Fi SSID and password to EEPROM (`?ssid=X&password=Y`) |
+| `/forget-wifi` | `GET` | Clears saved Wi-Fi credentials from memory |
+| `/toggle-mode` | `GET` | Toggles between Automatic and Manual modes |
+| `/manual-on` | `GET` | Turns on the pump manually |
+| `/manual-off` | `GET` | Turns off the pump manually |
+| `/set-manual-timer` | `GET` | Enables a countdown manual timer (`?min=X`) |
+| `/cancel-timer` | `GET` | Cancels any active manual shutdown timer |
+| `/set-timeout` | `GET` | Updates emergency timeout, water lift timeout, and quiet hours |
+| `/reset` | `GET` | Resets error locks and clears system alarm state |
 
 ---
 
-## 🚀 كيفية التشغيل والربط بالواي فاي (Setup & WiFi Configuration)
+## 🚀 Setup & WiFi Configuration
 
-1. **الرفع إلى ESP8266:**
-   - افتح الملف [`SmartPumpController.ino`](file:///c:/ArduinoProjects/sketch_aug_Denamo_startup_cabl15a/SmartPumpController.ino) ببرنامج Arduino IDE واضغط **Upload**.
+1. **Upload Code to ESP8266:**
+   - Open [`SmartPumpController.ino`](file:///c:/ArduinoProjects/SmartPumpController/SmartPumpController.ino) in the Arduino IDE and click **Upload**.
 
-2. **الربط لأول مرة (الاتصال المباشر):**
-   - افتح الواي فاي بجوالك، ستظهر لك شبكة جديدة باسم **`SmartPump-Setup`** (بدون كلمة سر).
-   - اتصل بالشبكة، وافتح المتصفح وادخل على العنوان التالي:
-     `http://192.168.4.1`
+2. **First-Time Connection (Direct AP Mode):**
+   - Connect your phone or PC to the Wi-Fi network named **`SmartPump-Setup`** (no password).
+   - Open a browser and navigate to: `http://192.168.4.1`
 
-3. **إضافة شبكة الواي فاي المنزلية:**
-   - اذهب لتبويب **"الإعدادات"** في واجهة الويب.
-   - ادخل اسم شبكتك المنزلية (SSID) وكلمة المرور واضغط **"حفظ والاتصال بالشبكة"**.
-   - سيقوم المتحكم بحفظ الشبكة بذاكرة EEPROM والاتصال بها تلقائياً في المرات القادمة.
+3. **Connect to Home Wi-Fi:**
+   - Go to the **Settings** tab in the Web UI.
+   - Enter your network SSID and Password, then click **"Save & Connect"**.
+   - The controller will save credentials to EEPROM and automatically reconnect on future boots.
 
 ---
 
-## 📜 الترخيص (License)
-هذا المشروع مفتوح المصدر ومخصص لتطوير أنظمة التحكم الذكية بالمياه.
+## 📜 License
+
+This project is open-source and intended for smart water control and automation applications.
