@@ -217,11 +217,13 @@ void handleRoot() {
     html += "<div class='card'>";
     html += "<span class='card-label'>التحكم في المحرك</span>";
     
-    // أزرار تشغيل وإيقاف
-    html += "<div class='controls-grid'>";
-    html += "<a href='/manual-on' class='btn btn-success'>تشغيل</a>";
-    html += "<a href='/manual-off' class='btn btn-danger'>إيقاف</a>";
-    html += "</div>";
+    // أزرار تشغيل وإيقاف تظهر فقط في الوضع اليدوي
+    if (manualMode) {
+      html += "<div class='controls-grid'>";
+      html += "<a href='/manual-on' class='btn btn-success'>تشغيل</a>";
+      html += "<a href='/manual-off' class='btn btn-danger'>إيقاف</a>";
+      html += "</div>";
+    }
     
     // أزرار التحكم بالنظام
     html += "<div class='controls-grid'>";
@@ -646,8 +648,8 @@ void loop() {
     int liftWater = digitalRead(liftSensorPin);
     digitalWrite(powerPin, HIGH);
 
-    // --- حماية الجفاف / كشف عدم رفع الماء ---
-    if (isPumping && (millis() - pumpStartTime >= liftTimeout)) {
+    // --- حماية الجفاف / كشف عدم رفع الماء (تعمل في الوضع التلقائي فقط) ---
+    if (isPumping && !manualMode && (millis() - pumpStartTime >= liftTimeout)) {
       if (liftWater == HIGH) { // HIGH تعني عدم وجود ماء عند المصب
         digitalWrite(relayPin, HIGH);
         isPumping = false;
@@ -664,14 +666,20 @@ void loop() {
     // --- منطق التشغيل والإيقاف ---
     if (highWater == LOW) {
       // وصل الماء للسلك العلوي → الخزان ممتلئ
-      if (isPumping && !manualMode) {
+      if (isPumping) {
         digitalWrite(relayPin, HIGH);
         isPumping = false;
-        currentStatus = "الخزان ممتلئ - تم إيقاف الدينمو";
-        addLog("تم إيقاف الدينمو - الخزان ممتلئ");
-        Serial.println("تم إيقاف الدينمو - الخزان ممتلئ");
-      } else if (isPumping && manualMode) {
-        currentStatus = "⚠️ الخزان ممتلئ - يُنصح بالإيقاف";
+        manualTimerActive = false;
+        manualTimerDuration = 0;
+        if (manualMode) {
+          currentStatus = "الخزان ممتلئ - تم إيقاف الدينمو (يدوي)";
+          addLog("إيقاف يدوي - الخزان ممتلئ");
+          Serial.println("إيقاف يدوي - الخزان ممتلئ");
+        } else {
+          currentStatus = "الخزان ممتلئ - تم إيقاف الدينمو";
+          addLog("تم إيقاف الدينمو - الخزان ممتلئ");
+          Serial.println("تم إيقاف الدينمو - الخزان ممتلئ");
+        }
       } else {
         currentStatus = "✅ الخزان ممتلئ";
       }
@@ -728,8 +736,8 @@ void loop() {
     }
   }
 
-  // -غ4. مؤقت الأمان (حارس النظام - يعمل دائماً بغض النظر عن الوضع) ---
-  if (isPumping && !systemError) {
+  // -غ4. مؤقت الأمان (حارس النظام - يعمل في الوضع التلقائي فقط) ---
+  if (isPumping && !manualMode && !systemError) {
     if (millis() - pumpStartTime >= maxPumpTime) {
       digitalWrite(relayPin, HIGH);
       isPumping = false;
