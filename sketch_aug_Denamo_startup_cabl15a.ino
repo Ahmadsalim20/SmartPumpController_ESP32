@@ -1,5 +1,6 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <time.h>
 
 // --- إعدادات الواي فاي ---
 const char* ssid = "LINK";         // اسم شبكة الواي فاي
@@ -24,11 +25,16 @@ String currentStatus = "جاري تهيئة النظام..."; // نص لعرضه
 String operationLog[10]; // سجل العمليات (آخر 10 عمليات)
 int logIndex = 0;
 
+// --- متغيرات وقت الهدوء المحظور (Quiet Hours) ---
+bool quietModeEnabled = false;   // تفعيل وقت الهدوء
+int quietStartHour = 22;         // ساعة البدء (0-23) - افتراضي 10 مساءً
+int quietEndHour = 6;            // ساعة الانتهاء (0-23) - افتراضي 6 صباحاً
+
 // --- متغيرات التوقيت (بديل الـ Delay) ---
 unsigned long pumpStartTime = 0; 
 unsigned long maxPumpTime = 60000UL; // وقت الطوارئ (بالميلي ثانية) - قابل للتعديل من الويب (افتراضي دقيقة واحدة)
 const unsigned long maxAllowedTime = 300000UL; // 300 دقيقة (5 ساعات) كحد أقصى (للحماية)
-const unsigned long liftTimeout = 15000UL; // فترة سماح كشف رفع الماء (15 ثانية)
+unsigned long liftTimeout = 15000UL; // فترة سماح كشف رفع الماء (بالملي ثانية) - قابلة للتعديل من الويب (افتراضي 15 ثانية)
 unsigned long lastSensorRead = 0;            // متى كانت آخر قراءة للحساس؟
 
 // --- تايمر الوضع اليدوي ---
@@ -39,6 +45,30 @@ unsigned long manualTimerDuration = 0; // مدة التايمر اليدوي ب�
 void addLog(String message) {
   operationLog[logIndex] = message;
   logIndex = (logIndex + 1) % 10;
+}
+
+// دالة التحقق مما إذا كنا في وقت الهدوء المحظور للتشغيل التلقائي
+bool isQuietHours() {
+  if (!quietModeEnabled) return false;
+  
+  time_t now = time(nullptr);
+  if (now < 1000000000ULL) {
+    // لم يتم مزامنة الوقت بعد من الإنترنت
+    return false; 
+  }
+  
+  struct tm* timeinfo = localtime(&now);
+  int currentHour = timeinfo->tm_hour;
+  
+  if (quietStartHour == quietEndHour) {
+    return false; // معطل
+  }
+  
+  if (quietStartHour < quietEndHour) {
+    return (currentHour >= quietStartHour && currentHour < quietEndHour);
+  } else {
+    return (currentHour >= quietStartHour || currentHour < quietEndHour);
+  }
 }
 
 // ---------------------------------------------------------
@@ -245,15 +275,42 @@ void handleRoot() {
   html += "<div id='settingsTab' class='tab-content'>";
   html += "<form action='/set-timeout' method='GET' class='settings-group'>";
   html += "<div class='settings-row'>";
-  html += "<span class='settings-label'>حد وقت الطوارئ</span>";
+  html += "<span class='settings-label'>حد وقت الطوارئ (دقائق)</span>";
   html += "<input type='number' name='minutes' class='settings-input' min='1' max='300' value='" + String(maxPumpTime / 60000UL) + "' required>";
+  html += "</div>";
+  html += "<div class='settings-row'>";
+  html += "<span class='settings-label'>زمن كشف رفع الماء (ثواني)</span>";
+  html += "<input type='number' name='liftSec' class='settings-input' min='1' max='300' value='" + String(liftTimeout / 1000UL) + "' required>";
+  html += "</div>";
+  html += "<div class='settings-row' style='margin-top: 10px; border-top: 1px solid #e2e8f0; padding-top: 10px;'>";
+  html += "<span class='settings-label'>تفعيل وقت الهدوء المحظور</span>";
+  html += "<input type='checkbox' name='quietEnabled' value='1' style='width: 18px; height: 18px; cursor: pointer;' " + String(quietModeEnabled ? "checked" : "") + ">";
+  html += "</div>";
+  html += "<div class='settings-row'>";
+  html += "<span class='settings-label'>ساعة البدء (0-23)</span>";
+  html += "<input type='number' name='quietStart' class='settings-input' min='0' max='23' value='" + String(quietStartHour) + "'>";
+  html += "</div>";
+  html += "<div class='settings-row'>";
+  html += "<span class='settings-label'>ساعة الانتهاء (0-23)</span>";
+  html += "<input type='number' name='quietEnd' class='settings-input' min='0' max='23' value='" + String(quietEndHour) + "'>";
   html += "</div>";
   html += "<button type='submit' class='btn btn-primary' style='padding: 10px;'>حفظ الإعدادات</button>";
   html += "</form>";
-  html += "<div class='settings-desc'>النطاق المسموح به: من 1 إلى 300 دقيقة</div>";
+  html += "<div class='settings-desc'>حد الطوارئ: 1-300 دقيقة | زمن رفع الماء: 1-300 ثانية | وقت الهدوء: 0-23 ساعة</div>";
   html += "</div>";
 
   html += "</div>"; // tabs-card
+
+  // عرض وقت النظام
+  String currentTimeStr = "غير متزامن";
+  time_t now = time(nullptr);
+  if (now > 1000000000ULL) {
+    struct tm* timeinfo = localtime(&now);
+    char buf[20];
+    sprintf(buf, "%02d:%02d:%02d", timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+    currentTimeStr = String(buf);
+  }
+  html += "<div style='font-size: 11px; color: #64748b; text-align: center; margin-top: 8px; font-weight: 600;'>وقت النظام الحالي: <span id='sysTimeLabel'>" + currentTimeStr + "</span></div>";
 
   html += "</div>"; // container
 
@@ -274,6 +331,7 @@ void handleRoot() {
   html += "    var st = document.getElementById('statusText'); if(st) st.textContent = data.status;";
   html += "    var pr = document.getElementById('pumpRow'); if(pr) pr.innerHTML = data.pumpRow;";
   html += "    var ll = document.getElementById('logList'); if(ll) ll.innerHTML = data.logs;";
+  html += "    var tl = document.getElementById('sysTimeLabel'); if(tl) tl.textContent = data.systemTime;";
   
   html += "    var tb = document.getElementById('timerBig');";
   html += "    if (tb && data.timerRemaining >= 0) {";
@@ -335,7 +393,17 @@ void handleStatus() {
       logs += "<div class='log-item'>" + operationLog[idx] + "</div>";
     }
   }
-  json += "\"logs\":\"" + logs + "\"";
+  json += "\"logs\":\"" + logs + "\",";
+
+  String currentTimeStr = "غير متزامن";
+  time_t nowTime = time(nullptr);
+  if (nowTime > 1000000000ULL) {
+    struct tm* timeinfo = localtime(&nowTime);
+    char buf[20];
+    sprintf(buf, "%02d:%02d:%02d", timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+    currentTimeStr = String(buf);
+  }
+  json += "\"systemTime\":\"" + currentTimeStr + "\"";
   json += "}";
   
   server.send(200, "application/json", json);
@@ -431,21 +499,66 @@ void handleManualOff() {
   server.send(303);
 }
 
-// دالة تحديث وقت الطوارئ
+// دالة تحديث وقت الطوارئ وزمن كشف رفع الماء ووقت الهدوء
 void handleSetTimeout() {
+  bool updated = false;
+  String statusMsg = "";
+
   if (server.hasArg("minutes")) {
     int minutes = server.arg("minutes").toInt();
-
-    // التحقق من أن القيمة بين 1 و 300 دقيقة
     if (minutes >= 1 && minutes <= 300) {
-      maxPumpTime = minutes * 60000UL; // تحويل الدقائق إلى ميلي ثانية
-      currentStatus = "تم تحديث وقت الطوارئ إلى " + String(minutes) + " دقيقة";
+      maxPumpTime = (unsigned long)minutes * 60000UL;
+      statusMsg += "تم تحديث وقت الطوارئ إلى " + String(minutes) + " دقيقة. ";
       addLog("تم تحديث وقت الطوارئ: " + String(minutes) + " دقيقة");
-      Serial.println("تم تحديث وقت الطوارئ إلى " + String(minutes) + " دقيقة");
-    } else {
-      currentStatus = "خطأ: القيمة يجب أن تكون بين 1 و 300 دقيقة";
-      addLog("محاولة تعيين وقت غير صالح: " + String(minutes) + " دقيقة");
+      updated = true;
     }
+  }
+
+  if (server.hasArg("liftSec")) {
+    int seconds = server.arg("liftSec").toInt();
+    if (seconds >= 1 && seconds <= 300) {
+      liftTimeout = (unsigned long)seconds * 1000UL;
+      statusMsg += "تم تحديث زمن رفع الماء إلى " + String(seconds) + " ثانية. ";
+      addLog("تم تحديث زمن رفع الماء: " + String(seconds) + " ثانية");
+      updated = true;
+    }
+  }
+
+  // إذا تم إرسال النموذج (التحقق عبر minutes)
+  if (server.hasArg("minutes")) {
+    bool newEnabled = server.hasArg("quietEnabled");
+    if (newEnabled != quietModeEnabled) {
+      quietModeEnabled = newEnabled;
+      updated = true;
+      addLog(quietModeEnabled ? "تم تفعيل وقت الهدوء" : "تم إلغاء وقت الهدوء");
+    }
+  }
+
+  if (server.hasArg("quietStart")) {
+    int startH = server.arg("quietStart").toInt();
+    if (startH >= 0 && startH <= 23 && startH != quietStartHour) {
+      quietStartHour = startH;
+      updated = true;
+      addLog("بدء وقت الهدوء: " + String(startH));
+    }
+  }
+
+  if (server.hasArg("quietEnd")) {
+    int endH = server.arg("quietEnd").toInt();
+    if (endH >= 0 && endH <= 23 && endH != quietEndHour) {
+      quietEndHour = endH;
+      updated = true;
+      addLog("انتهاء وقت الهدوء: " + String(endH));
+    }
+  }
+
+  if (updated) {
+    if (statusMsg == "") {
+      statusMsg = "تم حفظ إعدادات وقت الهدوء بنجاح.";
+    }
+    currentStatus = statusMsg;
+  } else {
+    currentStatus = "خطأ في تعديل الإعدادات";
   }
 
   server.sendHeader("Location", "/", true);
@@ -465,6 +578,9 @@ void setup() {
 
   digitalWrite(powerPin, HIGH); 
   digitalWrite(relayPin, HIGH); // إيقاف الدينمو (حسب نوع المرحل لديك)
+
+  // تهيئة وتزامن وقت النظام عبر الإنترنت (GMT+3)
+  configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
 
   // الاتصال بالواي فاي
   Serial.println();
@@ -511,6 +627,16 @@ void loop() {
       return;
     }
 
+    // --- فحص إيقاف المضخة التلقائية عند دخول وقت الهدوء ---
+    if (isPumping && !manualMode && isQuietHours()) {
+      digitalWrite(relayPin, HIGH);
+      isPumping = false;
+      currentStatus = "⏸️ تم إيقاف الدينمو تلقائياً لدخول وقت الهدوء المحظور";
+      addLog("إيقاف مؤقت: وقت الهدوء");
+      Serial.println("إيقاف مؤقت للدينمو لدخول وقت الهدوء المحظور");
+      return;
+    }
+
     // --- حماية الأسلاك وقراءة الحساسات ---
     digitalWrite(powerPin, LOW);
     delay(10); // تأخير بسيط جداً لا يؤثر على السيرفر
@@ -553,12 +679,16 @@ void loop() {
     else if (lowWater == HIGH) {
       // الماء نزل تحت السلك السفلي → تشغيل تلقائي
       if (!isPumping && !manualMode) {
-        digitalWrite(relayPin, LOW);
-        isPumping = true;
-        pumpStartTime = millis();
-        currentStatus = "🔴 مستوى حرج - تم تشغيل الدينمو تلقائياً";
-        addLog("تم تشغيل الدينمو - مستوى حرج");
-        Serial.println("تم تشغيل الدينمو - مستوى حرج");
+        if (isQuietHours()) {
+          currentStatus = "⏸️ مستوى حرج - تم تأجيل التشغيل لوجود وقت الهدوء المحظور";
+        } else {
+          digitalWrite(relayPin, LOW);
+          isPumping = true;
+          pumpStartTime = millis();
+          currentStatus = "🔴 مستوى حرج - تم تشغيل الدينمو تلقائياً";
+          addLog("تم تشغيل الدينمو - مستوى حرج");
+          Serial.println("تم تشغيل الدينمو - مستوى حرج");
+        }
       } else if (isPumping) {
         if (manualMode) currentStatus = "🖐 يدوي - جاري التعبئة | المستوى حرج";
         else currentStatus = "⚡ جاري التعبئة | المستوى حرج";
