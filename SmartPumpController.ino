@@ -14,6 +14,10 @@ const char* apPassword = "";            // Access Point Password (open for easy 
 ESP8266WebServer server(80);
 
 // --- Pin Definitions ---
+#ifndef LED_BUILTIN
+#define LED_BUILTIN 2 // GPIO2 / D4 default on ESP8266
+#endif
+const int ledPin = LED_BUILTIN; // Built-in LED pin (Heartbeat indicator)
 const int relayPin = 5;       // D1: Controls the pump relay
 const int highSensorPin = 4;  // D2: High level sensor wire (stop point)
 const int lowSensorPin = 14;  // D5: Low level sensor wire (start point)
@@ -40,6 +44,9 @@ unsigned long maxPumpTime = 60000UL; // Emergency timeout (ms) - web configurabl
 const unsigned long maxAllowedTime = 300000UL; // 300 minutes max limit (protection safeguard)
 unsigned long liftTimeout = 15000UL; // Water lift timeout (ms) - web configurable (default 15 sec)
 unsigned long lastSensorRead = 0;            // Last sensor reading timestamp
+unsigned long lastLedBlink = 0;              // Built-in LED heartbeat timestamp
+const unsigned long ledBlinkInterval = 500;  // Heartbeat blink interval (500 ms)
+bool ledState = false;                       // Built-in LED state
 
 // --- Manual Mode Timer ---
 bool   manualTimerActive  = false;   // Is manual timer active?
@@ -693,6 +700,7 @@ void setup() {
   loadSettings();
 
   // Configure pin modes
+  pinMode(ledPin, OUTPUT);
   pinMode(relayPin, OUTPUT);
   pinMode(powerPin, OUTPUT);
   pinMode(highSensorPin, INPUT_PULLUP);
@@ -700,6 +708,7 @@ void setup() {
   pinMode(warningSensorPin, INPUT_PULLUP);
   pinMode(liftSensorPin, INPUT_PULLUP);
 
+  digitalWrite(ledPin, HIGH); // Off initially (active LOW on ESP8266)
   digitalWrite(powerPin, HIGH); 
   digitalWrite(relayPin, HIGH);
 
@@ -760,6 +769,13 @@ void setup() {
 
 // ---------------------------------------------------------
 void loop() {
+  // 0. Non-blocking built-in LED heartbeat blink (indicates ESP is running)
+  if (millis() - lastLedBlink >= ledBlinkInterval) {
+    lastLedBlink = millis();
+    ledState = !ledState;
+    digitalWrite(ledPin, ledState ? LOW : HIGH); // ESP8266 built-in LED is active LOW
+  }
+
   // 1. Handle HTTP client requests
   server.handleClient();
 
