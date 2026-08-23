@@ -18,7 +18,7 @@
 #include <ArduinoJson.h>
 
 // 1. رقم الإصدار الحالي المثبت على هذا الجهاز
-const char* CURRENT_FIRMWARE_VERSION = "v1.1.14";
+const char* CURRENT_FIRMWARE_VERSION = "v1.1.13";
 
 // 2. الـ UUID الخاص بموديل الجهاز في Supabase (من جدول hardware_models)
 const char* HARDWARE_MODEL_ID = "8c3e340e-0e68-4cce-af3c-c38f2ef945fa";
@@ -49,7 +49,7 @@ void reportOTAResult(const String& targetFirmwareId, const String& status, const
     if (http.begin(client, OTA_CHECK_URL)) {
         http.addHeader("Content-Type", "application/json");
 
-        StaticJsonDocument<512> reportDoc;
+        DynamicJsonDocument reportDoc(512);
         reportDoc["hardware_model_id"] = HARDWARE_MODEL_ID;
         reportDoc["current_version"] = CURRENT_FIRMWARE_VERSION;
         reportDoc["mac_address"] = WiFi.macAddress();
@@ -79,12 +79,10 @@ void checkAndApplyOTA() {
     // ⚡ انتظار مزامنة الوقت (NTP) - مطلوب لاتصال TLS/SSL
     Serial.println("[OTA] Waiting for NTP time sync...");
     int ntpRetries = 0;
-    while (time(nullptr) < 100000 && ntpRetries < 20) {
-        delay(500);
-        Serial.print(".");
+    while (time(nullptr) < 100000 && ntpRetries < 15) {
+        delay(300);
         ntpRetries++;
     }
-    Serial.println();
 
     if (time(nullptr) < 100000) {
         Serial.println("[OTA] Warning: NTP time sync may have failed, attempting anyway...");
@@ -95,13 +93,12 @@ void checkAndApplyOTA() {
     WiFiClientSecure client;
     client.setInsecure(); // في الإنتاج يفضل إضافة Root CA Cert
 
-    // ⚡ ضبط حجم rxBuffer إلى 2048 بايت لقراءة شهادة Supabase/Cloudflare SSL
     #if defined(ESP8266)
     client.setBufferSizes(2048, 512);
     #endif
 
     HTTPClient http;
-    http.setTimeout(15000); // ⚡ زيادة مهلة الاتصال إلى 15 ثانية
+    http.setTimeout(15000); // ⚡ مهلة الاتصال 15 ثانية
 
     if (!http.begin(client, OTA_CHECK_URL)) {
         Serial.println("[OTA] Connection failed to OTA check URL.");
@@ -111,7 +108,7 @@ void checkAndApplyOTA() {
     http.addHeader("Content-Type", "application/json");
 
     // إرسال بيانات الجهاز الحالية والماك أدريس للـ Edge Function
-    StaticJsonDocument<300> reqDoc;
+    DynamicJsonDocument reqDoc(300);
     reqDoc["hardware_model_id"] = HARDWARE_MODEL_ID;
     reqDoc["current_version"] = CURRENT_FIRMWARE_VERSION;
     reqDoc["mac_address"] = WiFi.macAddress();
@@ -123,7 +120,6 @@ void checkAndApplyOTA() {
 
     int httpCode = http.POST(requestBody);
 
-
     if (httpCode != HTTP_CODE_OK) {
         Serial.printf("[OTA] Check failed, HTTP code: %d\n", httpCode);
         http.end();
@@ -131,12 +127,11 @@ void checkAndApplyOTA() {
     }
 
     String payload = http.getString();
-    // ⚡ إغلاق اتصال الفحص فوراً قبل فتح اتصال التنزيل
-    http.end();
+    http.end(); // ⚡ إغلاق الاتصال الأول فوراً تحريرًا للذاكرة
 
     Serial.printf("[OTA] Response: %s\n", payload.c_str());
 
-    StaticJsonDocument<1024> resDoc;
+    DynamicJsonDocument resDoc(1024);
     DeserializationError error = deserializeJson(resDoc, payload);
 
     if (error) {
@@ -158,10 +153,9 @@ void checkAndApplyOTA() {
     String targetFirmwareId = resDoc["firmware_id"].as<String>();
 
     Serial.printf("[OTA] New version found: %s\n", latestVersion.c_str());
-    Serial.printf("[OTA] Download URL: %s\n", downloadUrl.c_str());
     Serial.println("[OTA] Starting firmware download...");
 
-    // ⚡ استخدام WiFiClientSecure جديد للتنزيل لتجنب تعارض SSL
+    // ⚡ استخدام WiFiClientSecure جديد للتنزيل
     WiFiClientSecure dlClient;
     dlClient.setInsecure();
     #if defined(ESP8266)
@@ -169,7 +163,7 @@ void checkAndApplyOTA() {
     #endif
 
     HTTPClient httpDownload;
-    httpDownload.setTimeout(30000); // 30 seconds timeout for download
+    httpDownload.setTimeout(30000); // 30 ثانية مهلة تنزيل الملف
     if (!httpDownload.begin(dlClient, downloadUrl)) {
         Serial.println("[OTA] Failed to connect to download URL.");
         reportOTAResult(targetFirmwareId, "failed", "Download connection failed");
@@ -188,7 +182,6 @@ void checkAndApplyOTA() {
     int contentLength = httpDownload.getSize();
     Serial.printf("[OTA] Firmware size: %d bytes\n", contentLength);
 
-    // ⚡ معالجة حالة عدم معرفة حجم الملف
     if (contentLength <= 0) {
         Serial.println("[OTA] Error: Invalid content length from server.");
         reportOTAResult(targetFirmwareId, "failed", "Invalid content length: " + String(contentLength));
@@ -207,9 +200,17 @@ void checkAndApplyOTA() {
 
     Serial.println("[OTA] Flashing firmware...");
     WiFiClient* stream = httpDownload.getStreamPtr();
-    stream->setTimeout(15000); // ⚡ زيادة مهلة قراءة البث عبر SSL لـ 15 ثانية
+    stream->setTimeout(15000);
 
-    uint8_t buff[1024] = {0};
+    // ⚡ حجز الـ buffer على الـ Heap بدلاً من الـ Stack لمنع Stack Overflow
+    uint8_t* buff = (uint8_t*)malloc(1024);
+    if (!buff) {
+        Serial.println("[OTA] Out of memory for download buffer!");
+        reportOTAResult(targetFirmwareId, "failed", "OOM for download buffer");
+        httpDownload.end();
+        return;
+    }
+
     size_t totalWritten = 0;
     unsigned long lastProgressLog = 0;
     unsigned long lastReadTime = millis();
@@ -217,7 +218,7 @@ void checkAndApplyOTA() {
     while (httpDownload.connected() && (totalWritten < (size_t)contentLength)) {
         size_t sizeAvailable = stream->available();
         if (sizeAvailable > 0) {
-            int c = stream->readBytes(buff, min(sizeAvailable, sizeof(buff)));
+            int c = stream->readBytes(buff, min(sizeAvailable, (size_t)1024));
             if (c > 0) {
                 size_t written = Update.write(buff, c);
                 if (written != (size_t)c) {
@@ -227,14 +228,13 @@ void checkAndApplyOTA() {
                 totalWritten += written;
                 lastReadTime = millis();
 
-                // طباعة نسبة تقدم التنزيل والتثبيت كل 50 كيلوبايت
                 if (totalWritten - lastProgressLog >= 51200 || totalWritten == (size_t)contentLength) {
                     lastProgressLog = totalWritten;
-                    Serial.printf("[OTA] Flashing progress: %d / %d bytes (%d%%)\n", totalWritten, contentLength, (totalWritten * 100) / contentLength);
+                    Serial.printf("[OTA] Progress: %d / %d bytes (%d%%)\n", totalWritten, contentLength, (totalWritten * 100) / contentLength);
                 }
             }
         } else {
-            if (millis() - lastReadTime > 25000) { // مهلة 25 ثانية عند انقطاع البيانات
+            if (millis() - lastReadTime > 25000) {
                 Serial.println("[OTA] Download timeout: No data received for 25 seconds.");
                 break;
             }
@@ -242,9 +242,12 @@ void checkAndApplyOTA() {
         }
     }
 
+    // ⚡ تحرير الـ buffer بعد الانتهاء
+    free(buff);
+
     if (totalWritten != (size_t)contentLength) {
         Serial.printf("[OTA] Write mismatch! Written: %d, Expected: %d\n", totalWritten, contentLength);
-        Update.end(false); // abort
+        Update.end(false);
         reportOTAResult(targetFirmwareId, "failed", "Write mismatch: " + String(totalWritten) + "/" + String(contentLength));
         httpDownload.end();
         return;
