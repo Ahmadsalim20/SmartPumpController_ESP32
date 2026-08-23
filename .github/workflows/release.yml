@@ -28,7 +28,7 @@ jobs:
       - name: Compile Firmware
         run: |
           # تأكد من تغيير SawnProject إلى اسم مجلد مشروعك
-          arduino-cli compile --fqbn esp8266:esp8266:generic --output-dir ./build ./SawnProject
+          arduino-cli compile --fqbn esp8266:esp8266:generic --output-dir ./build ./SmartPumpController
           mv ./build/*.bin ./build/firmware.bin
 
       - name: Sign Firmware and Generate Hash
