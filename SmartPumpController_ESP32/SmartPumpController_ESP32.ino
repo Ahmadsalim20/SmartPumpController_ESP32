@@ -3,6 +3,9 @@
 #include <time.h>
 #include <EEPROM.h>
 
+// Include SecureOTA header file
+#include "SecureOTA.h"
+
 // --- Wi-Fi Settings (AP Mode + Router STA Connection) ---
 String wifiSSID = "";        // Saved home Wi-Fi SSID
 String wifiPassword = "";    // Saved home Wi-Fi password
@@ -45,7 +48,7 @@ const unsigned long maxAllowedTime = 300000UL; // 300 minutes max limit (protect
 unsigned long liftTimeout = 15000UL; // Water lift timeout (ms) - web configurable (default 15 sec)
 unsigned long lastSensorRead = 0;            // Last sensor reading timestamp
 unsigned long lastLedBlink = 0;              // Built-in LED heartbeat timestamp
-const unsigned long ledBlinkInterval = 500;  // Heartbeat blink interval (500 ms)
+const unsigned long ledBlinkInterval = 100;  // Fast heartbeat blink interval (100 ms)
 bool ledState = false;                       // Built-in LED state
 
 // --- Manual Mode Timer ---
@@ -695,6 +698,9 @@ void handleSetTimeout() {
 // ---------------------------------------------------------
 void setup() {
   Serial.begin(115200);
+  
+  // Initialize OTA (this MUST be called before WiFi connect)
+  checkAndApplyOTA();
 
   // Load settings from EEPROM
   loadSettings();
