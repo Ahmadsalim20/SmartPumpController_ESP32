@@ -1,10 +1,10 @@
-
 name: Build, Sign, and Release SAWN Firmware
 
 on:
   push:
     tags:
       - 'v*.*.*' # يعمل تلقائياً عند دفع Tag يبدأ بحرف v
+  workflow_dispatch: # يتيح لك التشغيل اليدوي من GitHub إذا أردت التجربة
 
 jobs:
   build-and-release:
@@ -22,12 +22,11 @@ jobs:
           arduino-cli config add board_manager.additional_urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
           arduino-cli core update-index
           arduino-cli core install esp8266:esp8266
-          # إذا كان لديك مكتبات إضافية استخدم الأمر التالي:
-          # arduino-cli lib install "ArduinoJson" "PubSubClient"
+          # إذا كان لديك مكتبات إضافية غير مدمجة استخدم الأمر التالي:
+          # arduino-cli lib install "ArduinoJson"
 
       - name: Compile Firmware
         run: |
-          # تأكد من تغيير SawnProject إلى اسم مجلد مشروعك
           arduino-cli compile --fqbn esp8266:esp8266:generic --output-dir ./build ./SmartPumpController
           mv ./build/*.bin ./build/firmware.bin
 
@@ -63,23 +62,25 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          PROJECT_ID: ${{ secrets.SAWN_PROJECT_ID }}
+          HARDWARE_MODEL_ID: ${{ secrets.HARDWARE_MODEL_ID }}
           VERSION: ${{ github.ref_name }}
         run: |
           HASH=$(cat ./build/firmware.sha256)
           SIGNATURE=$(cat ./build/firmware.sig.b64)
+          FILE_PATH="sawn_esp8266/$VERSION/firmware.bin"
           
-          # إدراج البيانات في جدول firmware_versions باستخدام Supabase REST API
-          curl -X POST "$SUPABASE_URL/rest/v1/firmware_versions" \
+          # إدراج البيانات في جدول firmware_releases
+          curl -X POST "$SUPABASE_URL/rest/v1/firmware_releases" \
             -H "apikey: $SUPABASE_KEY" \
             -H "Authorization: Bearer $SUPABASE_KEY" \
             -H "Content-Type: application/json" \
             -H "Prefer: return=minimal" \
             -d "{
-              \"project_id\": \"$PROJECT_ID\",
-              \"version_number\": \"$VERSION\",
-              \"file_url\": \"firmware/sawn_esp8266/$VERSION/firmware.bin\",
+              \"hardware_model_id\": \"$HARDWARE_MODEL_ID\",
+              \"version\": \"$VERSION\",
+              \"release_channel\": \"stable\",
+              \"bin_file_path\": \"$FILE_PATH\",
               \"sha256_hash\": \"$HASH\",
               \"digital_signature\": \"$SIGNATURE\",
-              \"is_mandatory\": true
+              \"is_active\": true
             }"
