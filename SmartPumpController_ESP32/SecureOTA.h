@@ -8,7 +8,7 @@
 #include <ArduinoJson.h>
 
 // 1. رقم الإصدار الحالي المثبت على هذا الجهاز
-const char* CURRENT_FIRMWARE_VERSION = "v1.1.9";
+const char* CURRENT_FIRMWARE_VERSION = "v1.1.10";
 
 // 2. الـ UUID الخاص بموديل الجهاز في Supabase
 const char* HARDWARE_MODEL_ID = "8c3e340e-0e68-4cce-af3c-c38f2ef945fa";
