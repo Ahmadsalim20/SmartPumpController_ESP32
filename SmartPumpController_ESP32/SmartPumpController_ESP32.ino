@@ -48,7 +48,7 @@ const unsigned long maxAllowedTime = 300000UL; // 300 minutes max limit (protect
 unsigned long liftTimeout = 15000UL; // Water lift timeout (ms) - web configurable (default 15 sec)
 unsigned long lastSensorRead = 0;            // Last sensor reading timestamp
 unsigned long lastLedBlink = 0;              // Built-in LED heartbeat timestamp
-const unsigned long ledBlinkInterval = 100;  // Fast heartbeat blink interval (100 ms)
+const unsigned long ledBlinkInterval = 2000;  // Fast heartbeat blink interval (100 ms)
 bool ledState = false;                       // Built-in LED state
 
 // --- Manual Mode Timer ---
@@ -698,9 +698,6 @@ void handleSetTimeout() {
 // ---------------------------------------------------------
 void setup() {
   Serial.begin(115200);
-  
-  // Initialize OTA (this MUST be called before WiFi connect)
-  checkAndApplyOTA();
 
   // Load settings from EEPROM
   loadSettings();
@@ -748,6 +745,9 @@ void setup() {
       Serial.print("IP Address (Station): ");
       Serial.println(WiFi.localIP());
       addLog("Wi-Fi connected: " + wifiSSID);
+
+      // Check for OTA firmware update after Wi-Fi is connected
+      checkAndApplyOTA();
     } else {
       Serial.println("\nCould not connect to saved network. Operating in AP mode only.");
       addLog("Wi-Fi connection failed");

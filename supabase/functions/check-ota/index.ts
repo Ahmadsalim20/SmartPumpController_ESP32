@@ -12,6 +12,23 @@ serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Handle GET requests (e.g. browser testing or health checks)
+  if (req.method === "GET") {
+    return new Response(
+      JSON.stringify({
+        status: "online",
+        service: "Supabase Secure OTA Service",
+        message: "Send a POST request with JSON payload containing hardware_model_id, current_version, and mac_address.",
+        example_payload: {
+          hardware_model_id: "8c3e340e-0e68-4cce-af3c-c38f2ef945fa",
+          current_version: "v1.1.11",
+          mac_address: "AA:BB:CC:DD:EE:FF"
+        }
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey =
@@ -25,12 +42,25 @@ serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body = await req.json();
+    // Safely parse JSON body
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Invalid or empty JSON body in POST request." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { hardware_model_id, current_version, mac_address, status_report } = body;
 
     if (!hardware_model_id || !current_version) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: hardware_model_id or current_version" }),
+        JSON.stringify({
+          error: "Missing required fields: hardware_model_id or current_version",
+          received_body: body
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
