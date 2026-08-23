@@ -27,7 +27,7 @@ jobs:
 
       - name: Compile Firmware
         run: |
-          arduino-cli compile --fqbn esp8266:esp8266:generic --output-dir ./build ./SmartPumpController
+          arduino-cli compile --fqbn esp8266:esp8266:generic --output-dir ./build .
           mv ./build/*.bin ./build/firmware.bin
 
       - name: Sign Firmware and Generate Hash
