@@ -1,1 +1,85 @@
 
+name: Build, Sign, and Release SAWN Firmware
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # يعمل تلقائياً عند دفع Tag يبدأ بحرف v
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Install ESP8266 Core and Libraries
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp8266:esp8266
+          # إذا كان لديك مكتبات إضافية استخدم الأمر التالي:
+          # arduino-cli lib install "ArduinoJson" "PubSubClient"
+
+      - name: Compile Firmware
+        run: |
+          # تأكد من تغيير SawnProject إلى اسم مجلد مشروعك
+          arduino-cli compile --fqbn esp8266:esp8266:generic --output-dir ./build ./SawnProject
+          mv ./build/*.bin ./build/firmware.bin
+
+      - name: Sign Firmware and Generate Hash
+        env:
+          PRIVATE_KEY: ${{ secrets.SAWN_PRIVATE_KEY }}
+        run: |
+          # استخراج المفتاح السري لملف مؤقت
+          echo "$PRIVATE_KEY" > private.pem
+          
+          # توليد التوقيع الرقمي بصيغة Base64 لسهولة نقله وتخزينه
+          openssl dgst -sha256 -sign private.pem ./build/firmware.bin | openssl base64 -A > ./build/firmware.sig.b64
+          
+          # حساب بصمة SHA-256
+          sha256sum ./build/firmware.bin | awk '{ print $1 }' > ./build/firmware.sha256
+          
+          # مسح المفتاح السري فوراً
+          rm private.pem
+
+      - name: Upload Bin to Supabase Storage
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          VERSION: ${{ github.ref_name }} # يأخذ رقم الإصدار من الـ Tag
+        run: |
+          # رفع ملف الفيرموير إلى مسار خاص بالإصدار داخل bucket يسمى 'firmware'
+          curl -X POST "$SUPABASE_URL/storage/v1/object/firmware/sawn_esp8266/$VERSION/firmware.bin" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"./build/firmware.bin"
+
+      - name: Register Release in Supabase Database
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          PROJECT_ID: ${{ secrets.SAWN_PROJECT_ID }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          HASH=$(cat ./build/firmware.sha256)
+          SIGNATURE=$(cat ./build/firmware.sig.b64)
+          
+          # إدراج البيانات في جدول firmware_versions باستخدام Supabase REST API
+          curl -X POST "$SUPABASE_URL/rest/v1/firmware_versions" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d "{
+              \"project_id\": \"$PROJECT_ID\",
+              \"version_number\": \"$VERSION\",
+              \"file_url\": \"firmware/sawn_esp8266/$VERSION/firmware.bin\",
+              \"sha256_hash\": \"$HASH\",
+              \"digital_signature\": \"$SIGNATURE\",
+              \"is_mandatory\": true
+            }"
