@@ -48,7 +48,7 @@ const unsigned long maxAllowedTime = 300000UL; // 300 minutes max limit (protect
 unsigned long liftTimeout = 15000UL; // Water lift timeout (ms) - web configurable (default 15 sec)
 unsigned long lastSensorRead = 0;            // Last sensor reading timestamp
 unsigned long lastLedBlink = 0;              // Built-in LED heartbeat timestamp
-const unsigned long ledBlinkInterval = 1000;  // Fast heartbeat blink interval (100 ms)
+const unsigned long ledBlinkInterval = 100;  // Fast heartbeat blink interval (100 ms)
 bool ledState = false;                       // Built-in LED state
 
 // --- Manual Mode Timer ---
