@@ -18,7 +18,7 @@
 #include <ArduinoJson.h>
 
 // 1. رقم الإصدار الحالي المثبت على هذا الجهاز
-const char* CURRENT_FIRMWARE_VERSION = "v1.1.12";
+const char* CURRENT_FIRMWARE_VERSION = "v1.1.13";
 
 // 2. الـ UUID الخاص بموديل الجهاز في Supabase (من جدول hardware_models)
 const char* HARDWARE_MODEL_ID = "8c3e340e-0e68-4cce-af3c-c38f2ef945fa";
@@ -72,10 +72,33 @@ void checkAndApplyOTA() {
 
     Serial.println("[OTA] Checking for new firmware updates from Supabase...");
 
+    // ⚡ انتظار مزامنة الوقت (NTP) - مطلوب لاتصال TLS/SSL
+    Serial.println("[OTA] Waiting for NTP time sync...");
+    int ntpRetries = 0;
+    while (time(nullptr) < 100000 && ntpRetries < 20) {
+        delay(500);
+        Serial.print(".");
+        ntpRetries++;
+    }
+    Serial.println();
+
+    if (time(nullptr) < 100000) {
+        Serial.println("[OTA] Warning: NTP time sync may have failed, attempting anyway...");
+    } else {
+        Serial.println("[OTA] NTP time synced successfully.");
+    }
+
     WiFiClientSecure client;
     client.setInsecure(); // في الإنتاج يفضل إضافة Root CA Cert
 
+    // ⚡ ضبط حجم buffer الـ SSL لتناسب ذاكرة ESP8266 المحدودة
+    #if defined(ESP8266)
+    client.setBufferSizes(512, 512);
+    #endif
+
     HTTPClient http;
+    http.setTimeout(15000); // ⚡ زيادة مهلة الاتصال إلى 15 ثانية
+
     if (!http.begin(client, OTA_CHECK_URL)) {
         Serial.println("[OTA] Connection failed to OTA check URL.");
         return;
@@ -95,6 +118,7 @@ void checkAndApplyOTA() {
     Serial.printf("[OTA] Sending: %s\n", requestBody.c_str());
 
     int httpCode = http.POST(requestBody);
+
 
     if (httpCode != HTTP_CODE_OK) {
         Serial.printf("[OTA] Check failed, HTTP code: %d\n", httpCode);
