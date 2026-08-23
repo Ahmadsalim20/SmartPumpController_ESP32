@@ -48,7 +48,7 @@ const unsigned long maxAllowedTime = 300000UL; // 300 minutes max limit (protect
 unsigned long liftTimeout = 15000UL; // Water lift timeout (ms) - web configurable (default 15 sec)
 unsigned long lastSensorRead = 0;            // Last sensor reading timestamp
 unsigned long lastLedBlink = 0;              // Built-in LED heartbeat timestamp
-const unsigned long ledBlinkInterval = 1000;  // Fast heartbeat blink interval (100 ms)
+const unsigned long ledBlinkInterval = 100;  // Fast heartbeat blink interval (100 ms)
 bool ledState = false;                       // Built-in LED state
 
 // --- Manual Mode Timer ---
@@ -715,9 +715,6 @@ void setup() {
   digitalWrite(powerPin, HIGH); 
   digitalWrite(relayPin, HIGH);
 
-  // Configure NTP time sync (GMT+3)
-  configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
-
   // Enable dual Wi-Fi mode (AP + STA)
   WiFi.mode(WIFI_AP_STA);
   
@@ -745,6 +742,9 @@ void setup() {
       Serial.print("IP Address (Station): ");
       Serial.println(WiFi.localIP());
       addLog("Wi-Fi connected: " + wifiSSID);
+
+      // Start NTP time sync now that WiFi is connected
+      configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
 
       // Check for OTA firmware update after Wi-Fi is connected
       checkAndApplyOTA();

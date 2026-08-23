@@ -40,8 +40,12 @@ void reportOTAResult(const String& targetFirmwareId, const String& status, const
 
     WiFiClientSecure client;
     client.setInsecure();
+    #if defined(ESP8266)
+    client.setBufferSizes(2048, 512);
+    #endif
 
     HTTPClient http;
+    http.setTimeout(15000);
     if (http.begin(client, OTA_CHECK_URL)) {
         http.addHeader("Content-Type", "application/json");
 
@@ -91,9 +95,9 @@ void checkAndApplyOTA() {
     WiFiClientSecure client;
     client.setInsecure(); // في الإنتاج يفضل إضافة Root CA Cert
 
-    // ⚡ ضبط حجم buffer الـ SSL لتناسب ذاكرة ESP8266 المحدودة
+    // ⚡ ضبط حجم rxBuffer إلى 2048 بايت لقراءة شهادة Supabase/Cloudflare SSL
     #if defined(ESP8266)
-    client.setBufferSizes(512, 512);
+    client.setBufferSizes(2048, 512);
     #endif
 
     HTTPClient http;
@@ -160,8 +164,12 @@ void checkAndApplyOTA() {
     // ⚡ استخدام WiFiClientSecure جديد للتنزيل لتجنب تعارض SSL
     WiFiClientSecure dlClient;
     dlClient.setInsecure();
+    #if defined(ESP8266)
+    dlClient.setBufferSizes(2048, 512);
+    #endif
 
     HTTPClient httpDownload;
+    httpDownload.setTimeout(30000); // 30 seconds timeout for download
     if (!httpDownload.begin(dlClient, downloadUrl)) {
         Serial.println("[OTA] Failed to connect to download URL.");
         reportOTAResult(targetFirmwareId, "failed", "Download connection failed");
@@ -199,12 +207,45 @@ void checkAndApplyOTA() {
 
     Serial.println("[OTA] Flashing firmware...");
     WiFiClient* stream = httpDownload.getStreamPtr();
-    size_t written = Update.writeStream(*stream);
+    stream->setTimeout(15000); // ⚡ زيادة مهلة قراءة البث عبر SSL لـ 15 ثانية
 
-    if (written != (size_t)contentLength) {
-        Serial.printf("[OTA] Write mismatch! Written: %d, Expected: %d\n", written, contentLength);
+    uint8_t buff[1024] = {0};
+    size_t totalWritten = 0;
+    unsigned long lastProgressLog = 0;
+    unsigned long lastReadTime = millis();
+
+    while (httpDownload.connected() && (totalWritten < (size_t)contentLength)) {
+        size_t sizeAvailable = stream->available();
+        if (sizeAvailable > 0) {
+            int c = stream->readBytes(buff, min(sizeAvailable, sizeof(buff)));
+            if (c > 0) {
+                size_t written = Update.write(buff, c);
+                if (written != (size_t)c) {
+                    Serial.printf("[OTA] Flash write failed at byte %d\n", totalWritten);
+                    break;
+                }
+                totalWritten += written;
+                lastReadTime = millis();
+
+                // طباعة نسبة تقدم التنزيل والتثبيت كل 50 كيلوبايت
+                if (totalWritten - lastProgressLog >= 51200 || totalWritten == (size_t)contentLength) {
+                    lastProgressLog = totalWritten;
+                    Serial.printf("[OTA] Flashing progress: %d / %d bytes (%d%%)\n", totalWritten, contentLength, (totalWritten * 100) / contentLength);
+                }
+            }
+        } else {
+            if (millis() - lastReadTime > 25000) { // مهلة 25 ثانية عند انقطاع البيانات
+                Serial.println("[OTA] Download timeout: No data received for 25 seconds.");
+                break;
+            }
+            delay(10);
+        }
+    }
+
+    if (totalWritten != (size_t)contentLength) {
+        Serial.printf("[OTA] Write mismatch! Written: %d, Expected: %d\n", totalWritten, contentLength);
         Update.end(false); // abort
-        reportOTAResult(targetFirmwareId, "failed", "Write size mismatch");
+        reportOTAResult(targetFirmwareId, "failed", "Write mismatch: " + String(totalWritten) + "/" + String(contentLength));
         httpDownload.end();
         return;
     }
