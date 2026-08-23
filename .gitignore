@@ -1,0 +1,37 @@
+# Arduino / ESP32 build artifacts & binaries
+build/
+bin/
+*.elf
+*.hex
+*.bin
+*.map
+*.elf.dmp
+
+# Secret keys and private security files
+*.pem
+*.key
+*.crt
+*.pfx
+secrets.h
+config.private.h
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# IDE & Editor configurations / caches
+.vscode/
+.idea/
+.vs/
+*.suo
+*.user
+*.userosv
+*.sln.docstates
+
+# Temporary & OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.log
