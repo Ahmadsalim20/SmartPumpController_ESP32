@@ -18,7 +18,7 @@
 #include <ArduinoJson.h>
 
 // 1. رقم الإصدار الحالي المثبت على هذا الجهاز
-const char* CURRENT_FIRMWARE_VERSION = "v1.1.15";
+const char* CURRENT_FIRMWARE_VERSION = "v1.1.13";
 
 // 2. الـ UUID الخاص بموديل الجهاز في Supabase (من جدول hardware_models)
 const char* HARDWARE_MODEL_ID = "8c3e340e-0e68-4cce-af3c-c38f2ef945fa";
@@ -90,188 +90,185 @@ void checkAndApplyOTA() {
         Serial.println("[OTA] NTP time synced successfully.");
     }
 
-    WiFiClientSecure client;
-    client.setInsecure(); // في الإنتاج يفضل إضافة Root CA Cert
+    bool updateAvailable = false;
+    String downloadUrl, latestVersion, expectedHash, signature, targetFirmwareId;
 
-    #if defined(ESP8266)
-    client.setBufferSizes(2048, 512);
-    #endif
+    Serial.printf("[OTA] Free heap before check: %u bytes\n", ESP.getFreeHeap());
 
-    HTTPClient http;
-    http.setTimeout(15000); // ⚡ مهلة الاتصال 15 ثانية
+    // --- المرحلة الأولى: فحص التحديث داخل نطاق مغلق لتحرير ذاكرة SSL فور الانتهاء ---
+    {
+        WiFiClientSecure client;
+        client.setInsecure();
+        #if defined(ESP8266)
+        client.setBufferSizes(2048, 512);
+        #endif
 
-    if (!http.begin(client, OTA_CHECK_URL)) {
-        Serial.println("[OTA] Connection failed to OTA check URL.");
-        return;
-    }
+        HTTPClient http;
+        http.setTimeout(15000);
 
-    http.addHeader("Content-Type", "application/json");
+        if (http.begin(client, OTA_CHECK_URL)) {
+            http.addHeader("Content-Type", "application/json");
 
-    // إرسال بيانات الجهاز الحالية والماك أدريس للـ Edge Function
-    DynamicJsonDocument reqDoc(300);
-    reqDoc["hardware_model_id"] = HARDWARE_MODEL_ID;
-    reqDoc["current_version"] = CURRENT_FIRMWARE_VERSION;
-    reqDoc["mac_address"] = WiFi.macAddress();
+            DynamicJsonDocument reqDoc(300);
+            reqDoc["hardware_model_id"] = HARDWARE_MODEL_ID;
+            reqDoc["current_version"] = CURRENT_FIRMWARE_VERSION;
+            reqDoc["mac_address"] = WiFi.macAddress();
 
-    String requestBody;
-    serializeJson(reqDoc, requestBody);
+            String requestBody;
+            serializeJson(reqDoc, requestBody);
+            Serial.printf("[OTA] Sending: %s\n", requestBody.c_str());
 
-    Serial.printf("[OTA] Sending: %s\n", requestBody.c_str());
+            int httpCode = http.POST(requestBody);
+            if (httpCode == HTTP_CODE_OK) {
+                String payload = http.getString();
+                Serial.printf("[OTA] Response: %s\n", payload.c_str());
 
-    int httpCode = http.POST(requestBody);
+                DynamicJsonDocument resDoc(1024);
+                DeserializationError error = deserializeJson(resDoc, payload);
+                if (!error) {
+                    updateAvailable = resDoc["update_available"] | false;
+                    if (updateAvailable) {
+                        downloadUrl = resDoc["download_url"].as<String>();
+                        latestVersion = resDoc["version"].as<String>();
+                        expectedHash = resDoc["sha256_hash"].as<String>();
+                        signature = resDoc["digital_signature"].as<String>();
+                        targetFirmwareId = resDoc["firmware_id"].as<String>();
+                    }
+                } else {
+                    Serial.printf("[OTA] JSON parse failed: %s\n", error.c_str());
+                }
+            } else {
+                Serial.printf("[OTA] Check failed, HTTP code: %d\n", httpCode);
+            }
+            http.end();
+        }
+    } // ⚡ تدمير كائن client التابع للمرحلة الأولى وتفريغ 16KB من الذاكرة فوراً!
 
-    if (httpCode != HTTP_CODE_OK) {
-        Serial.printf("[OTA] Check failed, HTTP code: %d\n", httpCode);
-        http.end();
-        return;
-    }
-
-    String payload = http.getString();
-    http.end(); // ⚡ إغلاق الاتصال الأول فوراً تحريرًا للذاكرة
-
-    Serial.printf("[OTA] Response: %s\n", payload.c_str());
-
-    DynamicJsonDocument resDoc(1024);
-    DeserializationError error = deserializeJson(resDoc, payload);
-
-    if (error) {
-        Serial.printf("[OTA] JSON parse failed: %s\n", error.c_str());
-        return;
-    }
-
-    bool updateAvailable = resDoc["update_available"] | false;
+    Serial.printf("[OTA] Free heap after check: %u bytes\n", ESP.getFreeHeap());
 
     if (!updateAvailable) {
         Serial.println("[OTA] Firmware is up to date.");
         return;
     }
 
-    String downloadUrl = resDoc["download_url"].as<String>();
-    String latestVersion = resDoc["version"].as<String>();
-    String expectedHash = resDoc["sha256_hash"].as<String>();
-    String signature = resDoc["digital_signature"].as<String>();
-    String targetFirmwareId = resDoc["firmware_id"].as<String>();
-
     Serial.printf("[OTA] New version found: %s\n", latestVersion.c_str());
+    Serial.printf("[OTA] Free heap before download: %u bytes\n", ESP.getFreeHeap());
     Serial.println("[OTA] Starting firmware download...");
 
-    // ⚡ استخدام WiFiClientSecure جديد للتنزيل
-    WiFiClientSecure dlClient;
-    dlClient.setInsecure();
-    #if defined(ESP8266)
-    dlClient.setBufferSizes(2048, 512);
-    #endif
+    bool downloadSuccess = false;
+    String downloadErrorReason = "";
 
-    HTTPClient httpDownload;
-    httpDownload.setTimeout(30000); // 30 ثانية مهلة تنزيل الملف
-    if (!httpDownload.begin(dlClient, downloadUrl)) {
-        Serial.println("[OTA] Failed to connect to download URL.");
-        reportOTAResult(targetFirmwareId, "failed", "Download connection failed");
-        return;
-    }
+    // --- المرحلة الثانية: تنزيل وتثبيت الفيرموير داخل نطاق مغلق مستقل ---
+    {
+        HTTPClient httpDownload;
+        httpDownload.setTimeout(30000);
 
-    int code = httpDownload.GET();
+        bool beginSuccess = false;
+        WiFiClient* stream = nullptr;
 
-    if (code != HTTP_CODE_OK) {
-        Serial.printf("[OTA] Download failed, HTTP code: %d\n", code);
-        reportOTAResult(targetFirmwareId, "failed", "Download HTTP error " + String(code));
-        httpDownload.end();
-        return;
-    }
-
-    int contentLength = httpDownload.getSize();
-    Serial.printf("[OTA] Firmware size: %d bytes\n", contentLength);
-
-    if (contentLength <= 0) {
-        Serial.println("[OTA] Error: Invalid content length from server.");
-        reportOTAResult(targetFirmwareId, "failed", "Invalid content length: " + String(contentLength));
-        httpDownload.end();
-        return;
-    }
-
-    bool canBegin = Update.begin(contentLength);
-
-    if (!canBegin) {
-        Serial.println("[OTA] Not enough flash space for firmware update.");
-        reportOTAResult(targetFirmwareId, "failed", "Not enough flash space");
-        httpDownload.end();
-        return;
-    }
-
-    Serial.println("[OTA] Flashing firmware...");
-    WiFiClient* stream = httpDownload.getStreamPtr();
-    stream->setTimeout(15000);
-
-    // ⚡ حجز الـ buffer على الـ Heap بدلاً من الـ Stack لمنع Stack Overflow
-    uint8_t* buff = (uint8_t*)malloc(1024);
-    if (!buff) {
-        Serial.println("[OTA] Out of memory for download buffer!");
-        reportOTAResult(targetFirmwareId, "failed", "OOM for download buffer");
-        httpDownload.end();
-        return;
-    }
-
-    size_t totalWritten = 0;
-    unsigned long lastProgressLog = 0;
-    unsigned long lastReadTime = millis();
-
-    while (httpDownload.connected() && (totalWritten < (size_t)contentLength)) {
-        size_t sizeAvailable = stream->available();
-        if (sizeAvailable > 0) {
-            int c = stream->readBytes(buff, min(sizeAvailable, (size_t)1024));
-            if (c > 0) {
-                size_t written = Update.write(buff, c);
-                if (written != (size_t)c) {
-                    Serial.printf("[OTA] Flash write failed at byte %d\n", totalWritten);
-                    break;
-                }
-                totalWritten += written;
-                lastReadTime = millis();
-
-                if (totalWritten - lastProgressLog >= 51200 || totalWritten == (size_t)contentLength) {
-                    lastProgressLog = totalWritten;
-                    Serial.printf("[OTA] Progress: %d / %d bytes (%d%%)\n", totalWritten, contentLength, (totalWritten * 100) / contentLength);
-                }
-            }
+        #if defined(ESP8266)
+        WiFiClient plainClient;
+        WiFiClientSecure dlClient;
+        if (downloadUrl.startsWith("http://")) {
+            Serial.println("[OTA] Using HTTP (No TLS memory overhead)");
+            beginSuccess = httpDownload.begin(plainClient, downloadUrl);
         } else {
-            if (millis() - lastReadTime > 25000) {
-                Serial.println("[OTA] Download timeout: No data received for 25 seconds.");
-                break;
-            }
-            delay(10);
+            Serial.println("[OTA] Using HTTPS (BearSSL)");
+            dlClient.setInsecure();
+            // ملاحظة: تم إزالة setBufferSizes(2048, 512) لأن Supabase ترسل حزم TLS بحجم 16KB
+            // وتحديد البفر بـ 2048 كان يسبب انقطاع التنزيل عند 53KB
+            dlClient.setBufferSizes(4096, 512); 
+            beginSuccess = httpDownload.begin(dlClient, downloadUrl);
         }
-    }
+        #else
+        WiFiClientSecure dlClient;
+        dlClient.setInsecure();
+        beginSuccess = httpDownload.begin(dlClient, downloadUrl);
+        #endif
 
-    // ⚡ تحرير الـ buffer بعد الانتهاء
-    free(buff);
+        if (beginSuccess) {
+            int code = httpDownload.GET();
+            if (code == HTTP_CODE_OK) {
+                int contentLength = httpDownload.getSize();
+                Serial.printf("[OTA] Firmware size: %d bytes\n", contentLength);
 
-    if (totalWritten != (size_t)contentLength) {
-        Serial.printf("[OTA] Write mismatch! Written: %d, Expected: %d\n", totalWritten, contentLength);
-        Update.end(false);
-        reportOTAResult(targetFirmwareId, "failed", "Write mismatch: " + String(totalWritten) + "/" + String(contentLength));
-        httpDownload.end();
-        return;
-    }
+                if (contentLength > 0 && Update.begin(contentLength)) {
+                    Serial.println("[OTA] Flashing firmware...");
+                    stream = httpDownload.getStreamPtr();
+                    stream->setTimeout(15000);
 
-    Serial.println("[OTA] Download complete. Finalizing update...");
+                    uint8_t* buff = (uint8_t*)malloc(1024);
+                    if (buff) {
+                        size_t totalWritten = 0;
+                        unsigned long lastProgressLog = 0;
+                        unsigned long lastReadTime = millis();
 
-    if (Update.end()) {
-        if (Update.isFinished()) {
-            Serial.println("[OTA] ✅ Update successful! Reporting & rebooting...");
+                        while (totalWritten < (size_t)contentLength) {
+                            size_t sizeAvailable = stream->available();
+                            if (sizeAvailable > 0) {
+                                int c = stream->readBytes(buff, min(sizeAvailable, (size_t)1024));
+                                if (c > 0) {
+                                    size_t written = Update.write(buff, c);
+                                    if (written != (size_t)c) {
+                                        Serial.printf("[OTA] Flash write failed at byte %d\n", totalWritten);
+                                        break;
+                                    }
+                                    totalWritten += written;
+                                    lastReadTime = millis();
+
+                                    if (totalWritten - lastProgressLog >= 51200 || totalWritten == (size_t)contentLength) {
+                                        lastProgressLog = totalWritten;
+                                        Serial.printf("[OTA] Progress: %d / %d bytes (%d%%) | Heap: %u bytes\n", totalWritten, contentLength, (totalWritten * 100) / contentLength, ESP.getFreeHeap());
+                                    }
+                                }
+                            } else {
+                                if (millis() - lastReadTime > 25000) {
+                                    Serial.println("[OTA] Download timeout: No data received for 25 seconds.");
+                                    break;
+                                }
+                                delay(10);
+                            }
+                        }
+
+                        free(buff);
+
+                        if (totalWritten == (size_t)contentLength) {
+                            if (Update.end() && Update.isFinished()) {
+                                downloadSuccess = true;
+                            } else {
+                                downloadErrorReason = "Update end failed";
+                            }
+                        } else {
+                            Update.end(false);
+                            downloadErrorReason = "Write mismatch: " + String(totalWritten) + "/" + String(contentLength);
+                        }
+                    } else {
+                        downloadErrorReason = "OOM for download buffer";
+                    }
+                } else {
+                    downloadErrorReason = (contentLength <= 0) ? "Invalid content length" : "Not enough flash space";
+                }
+            } else {
+                downloadErrorReason = "Download HTTP error " + String(code);
+            }
             httpDownload.end();
-            reportOTAResult(targetFirmwareId, "success");
-            delay(500);
-            ESP.restart();
         } else {
-            Serial.println("[OTA] Update not finished.");
-            reportOTAResult(targetFirmwareId, "failed", "Update not finished");
+            downloadErrorReason = "Download connection failed";
         }
+    } // ⚡ تدمير كائنات الاتصال وتفريغ الذاكرة قبل إرسال التقرير
+
+    Serial.printf("[OTA] Free heap after download: %u bytes\n", ESP.getFreeHeap());
+
+    // --- المرحلة الثالثة: إرسال التقرير النهائي وإعادة التشغيل ---
+    if (downloadSuccess) {
+        Serial.println("[OTA] ✅ Update successful! Reporting & rebooting...");
+        reportOTAResult(targetFirmwareId, "success");
+        delay(500);
+        ESP.restart();
     } else {
-        String errMsg = "Update error code: " + String(Update.getError());
-        Serial.printf("[OTA] %s\n", errMsg.c_str());
-        reportOTAResult(targetFirmwareId, "failed", errMsg);
+        Serial.printf("[OTA] Update failed: %s\n", downloadErrorReason.c_str());
+        reportOTAResult(targetFirmwareId, "failed", downloadErrorReason);
     }
-    httpDownload.end();
 }
 
 #endif
