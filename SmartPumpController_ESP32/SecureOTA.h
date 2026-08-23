@@ -92,78 +92,118 @@ void checkAndApplyOTA() {
     String requestBody;
     serializeJson(reqDoc, requestBody);
 
+    Serial.printf("[OTA] Sending: %s\n", requestBody.c_str());
+
     int httpCode = http.POST(requestBody);
 
-    if (httpCode == HTTP_CODE_OK) {
-        String payload = http.getString();
-        StaticJsonDocument<1024> resDoc;
-        DeserializationError error = deserializeJson(resDoc, payload);
+    if (httpCode != HTTP_CODE_OK) {
+        Serial.printf("[OTA] Check failed, HTTP code: %d\n", httpCode);
+        http.end();
+        return;
+    }
 
-        if (error) {
-            Serial.printf("[OTA] JSON parse failed: %s\n", error.c_str());
-            http.end();
-            return;
-        }
+    String payload = http.getString();
+    // ⚡ إغلاق اتصال الفحص فوراً قبل فتح اتصال التنزيل
+    http.end();
 
-        bool updateAvailable = resDoc["update_available"] | false;
+    Serial.printf("[OTA] Response: %s\n", payload.c_str());
 
-        if (updateAvailable) {
-            String downloadUrl = resDoc["download_url"].as<String>();
-            String latestVersion = resDoc["version"].as<String>();
-            String expectedHash = resDoc["sha256_hash"].as<String>();
-            String signature = resDoc["digital_signature"].as<String>();
-            String targetFirmwareId = resDoc["firmware_id"].as<String>();
+    StaticJsonDocument<1024> resDoc;
+    DeserializationError error = deserializeJson(resDoc, payload);
 
-            Serial.printf("[OTA] New version found: %s. Starting download...\n", latestVersion.c_str());
+    if (error) {
+        Serial.printf("[OTA] JSON parse failed: %s\n", error.c_str());
+        return;
+    }
 
-            // بدء عملية تنزيل الـ Firmware وتثبيته
-            HTTPClient httpDownload;
-            httpDownload.begin(client, downloadUrl);
-            int code = httpDownload.GET();
+    bool updateAvailable = resDoc["update_available"] | false;
 
-            if (code == HTTP_CODE_OK) {
-                int contentLength = httpDownload.getSize();
-                bool canBegin = Update.begin(contentLength);
+    if (!updateAvailable) {
+        Serial.println("[OTA] Firmware is up to date.");
+        return;
+    }
 
-                if (canBegin) {
-                    WiFiClient* stream = httpDownload.getStreamPtr();
-                    size_t written = Update.writeStream(*stream);
+    String downloadUrl = resDoc["download_url"].as<String>();
+    String latestVersion = resDoc["version"].as<String>();
+    String expectedHash = resDoc["sha256_hash"].as<String>();
+    String signature = resDoc["digital_signature"].as<String>();
+    String targetFirmwareId = resDoc["firmware_id"].as<String>();
 
-                    if (written == contentLength) {
-                        Serial.println("[OTA] Download complete. Validating and flashing...");
-                    }
+    Serial.printf("[OTA] New version found: %s\n", latestVersion.c_str());
+    Serial.printf("[OTA] Download URL: %s\n", downloadUrl.c_str());
+    Serial.println("[OTA] Starting firmware download...");
 
-                    if (Update.end()) {
-                        if (Update.isFinished()) {
-                            Serial.println("[OTA] Update successful! Reporting status & rebooting...");
-                            reportOTAResult(targetFirmwareId, "success");
-                            delay(500);
-                            ESP.restart(); // إعادة التشغيل بالإصدار الجديد
-                        } else {
-                            Serial.println("[OTA] Update not finished.");
-                            reportOTAResult(targetFirmwareId, "failed", "Update not finished");
-                        }
-                    } else {
-                        String errMsg = "Update error code: " + String(Update.getError());
-                        Serial.printf("[OTA] %s\n", errMsg.c_str());
-                        reportOTAResult(targetFirmwareId, "failed", errMsg);
-                    }
-                } else {
-                    Serial.println("[OTA] Not enough space for firmware update.");
-                    reportOTAResult(targetFirmwareId, "failed", "Not enough flash space");
-                }
-            } else {
-                Serial.printf("[OTA] Download failed HTTP code: %d\n", code);
-                reportOTAResult(targetFirmwareId, "failed", "Download HTTP error " + String(code));
-            }
+    // ⚡ استخدام WiFiClientSecure جديد للتنزيل لتجنب تعارض SSL
+    WiFiClientSecure dlClient;
+    dlClient.setInsecure();
+
+    HTTPClient httpDownload;
+    if (!httpDownload.begin(dlClient, downloadUrl)) {
+        Serial.println("[OTA] Failed to connect to download URL.");
+        reportOTAResult(targetFirmwareId, "failed", "Download connection failed");
+        return;
+    }
+
+    int code = httpDownload.GET();
+
+    if (code != HTTP_CODE_OK) {
+        Serial.printf("[OTA] Download failed, HTTP code: %d\n", code);
+        reportOTAResult(targetFirmwareId, "failed", "Download HTTP error " + String(code));
+        httpDownload.end();
+        return;
+    }
+
+    int contentLength = httpDownload.getSize();
+    Serial.printf("[OTA] Firmware size: %d bytes\n", contentLength);
+
+    // ⚡ معالجة حالة عدم معرفة حجم الملف
+    if (contentLength <= 0) {
+        Serial.println("[OTA] Error: Invalid content length from server.");
+        reportOTAResult(targetFirmwareId, "failed", "Invalid content length: " + String(contentLength));
+        httpDownload.end();
+        return;
+    }
+
+    bool canBegin = Update.begin(contentLength);
+
+    if (!canBegin) {
+        Serial.println("[OTA] Not enough flash space for firmware update.");
+        reportOTAResult(targetFirmwareId, "failed", "Not enough flash space");
+        httpDownload.end();
+        return;
+    }
+
+    Serial.println("[OTA] Flashing firmware...");
+    WiFiClient* stream = httpDownload.getStreamPtr();
+    size_t written = Update.writeStream(*stream);
+
+    if (written != (size_t)contentLength) {
+        Serial.printf("[OTA] Write mismatch! Written: %d, Expected: %d\n", written, contentLength);
+        Update.end(false); // abort
+        reportOTAResult(targetFirmwareId, "failed", "Write size mismatch");
+        httpDownload.end();
+        return;
+    }
+
+    Serial.println("[OTA] Download complete. Finalizing update...");
+
+    if (Update.end()) {
+        if (Update.isFinished()) {
+            Serial.println("[OTA] ✅ Update successful! Reporting & rebooting...");
             httpDownload.end();
+            reportOTAResult(targetFirmwareId, "success");
+            delay(500);
+            ESP.restart();
         } else {
-            Serial.println("[OTA] Firmware is up to date.");
+            Serial.println("[OTA] Update not finished.");
+            reportOTAResult(targetFirmwareId, "failed", "Update not finished");
         }
     } else {
-        Serial.printf("[OTA] Check failed, HTTP code: %d\n", httpCode);
+        String errMsg = "Update error code: " + String(Update.getError());
+        Serial.printf("[OTA] %s\n", errMsg.c_str());
+        reportOTAResult(targetFirmwareId, "failed", errMsg);
     }
-    http.end();
+    httpDownload.end();
 }
 
 #endif
