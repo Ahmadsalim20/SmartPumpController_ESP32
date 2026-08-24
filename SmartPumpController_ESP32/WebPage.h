@@ -60,12 +60,9 @@ void handleRoot() {
   html += ".lbl{font-size:10px;color:var(--txt-m);margin-bottom:2px;}";
   html += ".val{font-size:12px;font-weight:700;}";
   html += ".val.on{color:var(--green);}.val.timer{color:var(--accent);}";
-  html += ".switch{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;}";
-  html += ".switch input{opacity:0;width:0;height:0;}";
-  html += ".slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.3s;border-radius:24px;}";
-  html += ".slider:before{position:absolute;content:'';height:18px;width:18px;left:3px;bottom:3px;background-color:white;transition:.3s;border-radius:50%;}";
-  html += "input:checked+.slider{background-color:var(--accent);}";
-  html += "input:checked+.slider:before{transform:translateX(20px);}";
+  html += ".sw-box{display:flex;background:var(--inp);border:1px solid var(--border);padding:3px;border-radius:8px;gap:4px;margin-bottom:10px;}";
+  html += ".sw-btn{flex:1;padding:7px;text-align:center;font-size:12px;font-weight:700;border-radius:6px;text-decoration:none;color:var(--txt-m);}";
+  html += ".sw-btn.active{background:white;color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,0.1);}";
   html += ".btn{display:flex;align-items:center;justify-content:center;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;}";
   html += ".btn-acc{background:var(--accent);color:white;}";
   html += ".btn-grn{background:var(--green);color:white;}";
@@ -142,12 +139,14 @@ void handleRoot() {
   html += "</div></div>";
 
   html += "<div class='card' style='margin-top:10px;'>";
-  html += "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;'>";
-  html += "<span style='font-size:11px;font-weight:700;color:var(--txt-m);'>التحكم والتشغيل</span>";
+  html += "<div style='font-size:11px;font-weight:700;color:var(--txt-m);margin-bottom:8px;'>التحكم والتشغيل</div>";
+  html += "<div class='sw-box'>";
   if (manualMode) {
-    html += "<span class='badge manual'>الوضع اليدوي</span>";
+    html += "<a href='/toggle-mode' class='sw-btn'>تلقائي</a>";
+    html += "<div class='sw-btn active'>يدوي</div>";
   } else {
-    html += "<span class='badge auto'>الوضع التلقائي</span>";
+    html += "<div class='sw-btn active'>تلقائي</div>";
+    html += "<a href='/toggle-mode' class='sw-btn'>يدوي</a>";
   }
   html += "</div>";
 
@@ -214,14 +213,6 @@ void handleRoot() {
 
   // Tab 4: الإعدادات
   html += "<div id='settingsTab' class='tab-pane'>";
-  html += "<div class='card' style='margin-bottom:10px;'>";
-  html += "<div style='font-size:11px;font-weight:700;color:var(--txt-m);margin-bottom:8px;'>نوع التشغيل</div>";
-  html += "<div style='display:flex;align-items:center;justify-content:space-between;'>";
-  html += "<div><div style='font-size:13px;font-weight:700;'>" + String(manualMode ? "الوضع اليدوي" : "الوضع التلقائي") + "</div>";
-  html += "<div style='font-size:11px;color:var(--txt-m);'>" + String(manualMode ? "التشغيل يدوي عبر الأزرار والتايمر" : "التشغيل تلقائي حسب مستشعرات الماء") + "</div></div>";
-  html += "<label class='switch'><input type='checkbox' onchange='window.location.href=\"/toggle-mode\"' " + String(manualMode ? "checked" : "") + "><span class='slider'></span></label>";
-  html += "</div></div>";
-
   html += "<form action='/set-timeout' method='GET'>";
   html += "<div class='card' style='margin-bottom:10px;'>";
   html += "<div style='font-size:11px;font-weight:700;color:var(--txt-m);margin-bottom:8px;'>حماية المضخة</div>";
