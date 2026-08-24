@@ -11,7 +11,7 @@
 extern ESP8266WebServer server;
 
 // ---------------------------------------------------------
-// دالة بناء صفحة الـ HTML (واجهة المستخدم)
+// دالة بناء صفحة الـ HTML (واجهة لوحة تحكم IoT الاحترافية)
 // ---------------------------------------------------------
 void handleRoot() {
   // وقت النظام
@@ -25,268 +25,305 @@ void handleRoot() {
   }
 
   String html = "<!DOCTYPE html><html lang='ar' dir='rtl'>";
-  html += "<head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=no'>";
-  html += "<title>SmartPump Controller</title><style>";
+  html += "<head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'>";
+  html += "<title>SmartPump IoT Dashboard</title>";
+  html += "<link rel='preconnect' href='https://fonts.googleapis.com'>";
+  html += "<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>";
+  html += "<link href='https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap' rel='stylesheet'>";
+  
+  html += "<style>";
+  // متسلسلة ألوان وتنسيقات أنظمة IoT المتطورة (Dark Glassmorphism Theme)
+  html += ":root{";
+  html += "--bg:#0b0f19;--card-bg:#151d30;--card-border:rgba(255,255,255,0.08);";
+  html += "--accent:#0284c7;--accent-glow:rgba(2,132,199,0.25);";
+  html += "--green:#10b981;--green-glow:rgba(16,185,129,0.25);";
+  html += "--red:#f43f5e;--red-glow:rgba(244,63,94,0.25);";
+  html += "--amber:#f59e0b;--amber-glow:rgba(245,158,11,0.25);";
+  html += "--txt:#f8fafc;--txt-muted:#94a3b8;--input-bg:#0f172a;";
+  html += "--radius:16px;--radius-sm:10px;";
+  html += "}";
 
-  // نظام الألوان
-  html += ":root{--blue:#1a56db;--blue-dk:#1343b5;--blue-lt:#e8effd;";
-  html += "--green:#2f9e44;--green-lt:#ebfbee;";
-  html += "--red:#e03131;--red-lt:#fff5f5;";
-  html += "--amber:#e67700;--amber-lt:#fff9db;";
-  html += "--g50:#f8f9fb;--g100:#f0f2f5;--g200:#e2e6ea;";
-  html += "--g400:#9aa3ae;--g600:#4b5563;--g800:#1f2937;";
-  html += "--sh:0 1px 4px rgba(0,0,0,.08);--r:14px;--rs:9px;}";
+  html += "*{box-sizing:border-box;margin:0;padding:0;font-family:'Tajawal',-apple-system,sans-serif;}";
+  html += "body{background:var(--bg);color:var(--txt);min-height:100vh;display:flex;justify-content:center;padding:12px 12px 36px;}";
+  html += ".app-container{width:100%;max-width:440px;display:flex;flex-direction:column;gap:14px;}";
 
-  html += "*{box-sizing:border-box;margin:0;padding:0;}";
-  html += "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Tahoma,sans-serif;";
-  html += "background:var(--g100);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:12px 12px 28px;}";
-  html += ".page{width:100%;max-width:390px;display:flex;flex-direction:column;gap:10px;}";
+  // الهيدر الرئيسي والشريط العلمي
+  html += ".hdr{display:flex;align-items:center;justify-content:space-between;background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius);padding:14px 16px;}";
+  html += ".hdr-brand{display:flex;align-items:center;gap:10px;}";
+  html += ".hdr-icon{width:36px;height:36px;background:rgba(2,132,199,0.15);border:1px solid var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;}";
+  html += ".hdr-title{font-size:16px;font-weight:700;color:var(--txt);}";
+  html += ".hdr-subtitle{font-size:11px;color:var(--txt-muted);}";
+  html += ".hdr-clock{font-size:13px;font-weight:700;color:var(--accent);background:rgba(2,132,199,0.1);padding:6px 10px;border-radius:8px;font-variant-numeric:tabular-nums;border:1px solid rgba(2,132,199,0.2);}";
 
-  // رأس الصفحة
-  html += ".hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 2px 2px;}";
-  html += ".hdr-title{font-size:17px;font-weight:800;color:var(--g800);}";
-  html += ".hdr-time{font-size:13px;font-weight:600;color:var(--g400);font-variant-numeric:tabular-nums;}";
+  // شريط حالة الاتصال والوضع
+  html += ".conn-bar{display:flex;align-items:center;justify-content:space-between;background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius);padding:10px 14px;}";
+  html += ".badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;}";
+  html += ".badge-dot{width:7px;height:7px;border-radius:50%;}";
+  html += ".badge-auto{background:rgba(16,185,129,0.15);color:var(--green);border:1px solid var(--green-glow);}";
+  html += ".badge-auto .badge-dot{background:var(--green);box-shadow:0 0 8px var(--green);}";
+  html += ".badge-manual{background:rgba(2,132,199,0.15);color:var(--accent);border:1px solid var(--accent-glow);}";
+  html += ".badge-manual .badge-dot{background:var(--accent);box-shadow:0 0 8px var(--accent);}";
+  html += ".badge-err{background:rgba(244,63,94,0.15);color:var(--red);border:1px solid var(--red-glow);}";
+  html += ".badge-err .badge-dot{background:var(--red);box-shadow:0 0 8px var(--red);}";
+  
+  html += ".wifi-status{font-size:11px;color:var(--txt-muted);display:flex;align-items:center;gap:6px;}";
+  html += ".wifi-dot{width:6px;height:6px;border-radius:50%;}";
+  html += ".wifi-dot.on{background:var(--green);box-shadow:0 0 6px var(--green);}";
+  html += ".wifi-dot.off{background:var(--amber);box-shadow:0 0 6px var(--amber);}";
 
-  // شريط الوضع والسوتش
-  html += ".mode-bar{display:flex;align-items:center;justify-content:space-between;background:white;border-radius:var(--r);padding:10px 14px;box-shadow:var(--sh);}";
-  html += ".mode-info{display:flex;align-items:center;gap:8px;}";
-  html += ".mdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}";
-  html += ".mdot.auto{background:var(--green);animation:blink 2.5s infinite;}";
-  html += ".mdot.manual{background:var(--blue);animation:blink 1.8s infinite;}";
-  html += ".mdot.err{background:var(--red);}";
-  html += "@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}";
-  html += ".mlabel{font-size:13px;font-weight:700;color:var(--g800);}";
-  html += ".switch-link{display:flex;align-items:center;gap:8px;text-decoration:none;}";
-  html += ".switch-lbl{font-size:12px;font-weight:700;}";
-  html += ".switch-lbl.auto{color:var(--green);}.switch-lbl.manual{color:var(--blue);}.switch-lbl.err{color:var(--red);}";
-  html += ".switch-lbl.on{color:var(--green);}.switch-lbl.off{color:var(--g400);}";
-  html += ".switch-box{width:44px;height:24px;border-radius:12px;position:relative;transition:.25s ease;display:flex;align-items:center;padding:2px;}";
-  html += ".switch-box.auto{background:#c3fae8;}";
-  html += ".switch-box.manual{background:#d0ebff;}";
-  html += ".switch-box.err{background:#ffe3e3;cursor:not-allowed;}";
-  html += ".switch-box.on{background:#c3fae8;}";
-  html += ".switch-box.off{background:var(--g200);}";
-  html += ".switch-thumb{width:20px;height:20px;border-radius:50%;transition:.25s ease;box-shadow:0 1px 3px rgba(0,0,0,.2);}";
-  html += ".switch-box.auto .switch-thumb{background:var(--green);transform:translateX(0);}";
-  html += ".switch-box.manual .switch-thumb{background:var(--blue);transform:translateX(-20px);}";
-  html += ".switch-box.err .switch-thumb{background:var(--red);transform:translateX(0);}";
-  html += ".switch-box.on .switch-thumb{background:var(--green);transform:translateX(-20px);}";
-  html += ".switch-box.off .switch-thumb{background:white;transform:translateX(0);}";
-  html += ".pump-ctrl-box{display:flex;align-items:center;justify-content:space-between;background:var(--g50);border:1.5px solid var(--g200);border-radius:var(--rs);padding:10px 12px;}";
+  // البطاقة المحورية للحالة (Hero Card)
+  html += ".hero-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius);padding:18px;position:relative;overflow:hidden;}";
+  html += ".hero-card::before{content:'';position:absolute;top:0;right:0;width:100%;height:3px;}";
+  if (systemError)    html += ".hero-card::before{background:var(--red);box-shadow:0 0 12px var(--red);}";
+  else if (isPumping) html += ".hero-card::before{background:var(--accent);box-shadow:0 0 12px var(--accent);}";
+  else                html += ".hero-card::before{background:var(--green);box-shadow:0 0 12px var(--green);}";
 
-  // بطاقة الحالة
-  html += ".s-card{background:white;border-radius:var(--r);padding:16px;box-shadow:var(--sh);border-right:4px solid var(--g200);}";
-  if (systemError)    html += ".s-card{border-right-color:var(--red);background:var(--red-lt);}";
-  else if (isPumping) html += ".s-card{border-right-color:var(--blue);background:var(--blue-lt);}";
-  else                html += ".s-card{border-right-color:var(--green);background:var(--green-lt);}";
-  html += ".s-text{font-size:15px;font-weight:700;margin-bottom:10px;}";
-  if (systemError)    html += ".s-text{color:var(--red);}";
-  else if (isPumping) html += ".s-text{color:var(--blue);}";
-  else                html += ".s-text{color:var(--green);}";
-  html += ".s-meta{display:flex;border-top:1px solid var(--g200);padding-top:10px;}";
-  html += ".s-item{flex:1;text-align:center;}";
-  html += ".s-item+.s-item{border-right:1px solid var(--g200);}";
-  html += ".s-lbl{font-size:10px;color:var(--g400);font-weight:600;margin-bottom:3px;letter-spacing:.3px;}";
-  html += ".s-val{font-size:14px;font-weight:700;color:var(--g800);}";
-  html += ".s-val.on{color:var(--green);}.s-val.off{color:var(--g400);}.s-val.tk{color:var(--blue);font-variant-numeric:tabular-nums;}";
+  html += ".hero-status{font-size:17px;font-weight:700;margin-bottom:14px;line-height:1.4;}";
+  if (systemError)    html += ".hero-status{color:var(--red);}";
+  else if (isPumping) html += ".hero-status{color:var(--accent);}";
+  else                html += ".hero-status{color:var(--green);}";
 
-  // بطاقة التحكم
-  html += ".c-card{background:white;border-radius:var(--r);padding:14px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:10px;}";
-  html += ".sec-lbl{font-size:10px;font-weight:800;color:var(--g400);text-transform:uppercase;letter-spacing:.6px;}";
-  html += ".btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}";
-  html += ".btn{display:flex;align-items:center;justify-content:center;padding:11px 8px;border:none;border-radius:var(--rs);";
-  html += "font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;transition:.15s;}";
-  html += ".btn:active{transform:scale(.97);opacity:.85;}";
-  html += ".btn.blue{background:var(--blue);color:white;}.btn.blue:hover{background:var(--blue-dk);}";
-  html += ".btn.red{background:var(--red);color:white;}.btn.red:hover{background:#c92a2a;}";
-  html += ".btn.ghost{background:var(--g50);color:var(--g600);border:1.5px solid var(--g200);}.btn.ghost:hover{background:var(--g200);}";
-  html += ".btn.amber{background:var(--amber);color:white;}.btn.amber:hover{background:#d46b08;}";
-  html += ".btn.full{grid-column:1/-1;width:100%;}";
+  // مصفوفة المؤشرات السريعة (Metrics Grid)
+  html += ".metrics-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding-top:12px;border-top:1px solid var(--card-border);}";
+  html += ".metric-tile{background:rgba(15,23,42,0.6);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:10px;text-align:center;}";
+  html += ".metric-lbl{font-size:10px;color:var(--txt-muted);font-weight:600;margin-bottom:4px;}";
+  html += ".metric-val{font-size:13px;font-weight:700;color:var(--txt);}";
+  html += ".metric-val.on{color:var(--green);}.metric-val.off{color:var(--txt-muted);}.metric-val.timer{color:var(--accent);font-variant-numeric:tabular-nums;}";
 
-  // تايمر
-  html += ".tmr{background:var(--blue-lt);border:1.5px solid #c1d4f7;border-radius:var(--rs);padding:12px;}";
-  html += ".tmr-title{font-size:11px;font-weight:800;color:var(--blue);margin-bottom:8px;}";
-  html += ".tmr-big{font-size:30px;font-weight:900;color:var(--blue);text-align:center;letter-spacing:3px;font-variant-numeric:tabular-nums;margin:4px 0 8px;}";
-  html += ".tmr-row{display:flex;gap:8px;align-items:center;}";
-  html += ".tmr-inp{flex:1;padding:9px;border:1.5px solid #c1d4f7;border-radius:var(--rs);font-size:14px;text-align:center;background:white;outline:none;}";
-  html += ".tmr-inp:focus{border-color:var(--blue);}";
-  html += ".tmr-hint{font-size:10px;color:var(--g400);text-align:center;margin-top:5px;}";
+  // بطاقات التفاعل والتحكم
+  html += ".section-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius);padding:16px;}";
+  html += ".section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}";
+  html += ".section-title{font-size:12px;font-weight:700;color:var(--txt-muted);letter-spacing:0.5px;text-transform:uppercase;}";
 
-  // تبويبات
-  html += ".tabs{background:white;border-radius:var(--r);padding:12px;box-shadow:var(--sh);}";
-  html += ".tabs-nav{display:flex;background:var(--g100);padding:3px;border-radius:var(--rs);margin-bottom:12px;}";
-  html += ".tab-btn{flex:1;padding:7px;text-align:center;font-size:13px;font-weight:700;border-radius:7px;cursor:pointer;color:var(--g400);border:none;background:transparent;transition:.2s;}";
-  html += ".tab-btn.active{background:white;color:var(--g800);box-shadow:0 1px 4px rgba(0,0,0,.06);}";
-  html += ".tab-pane{display:none;}.tab-pane.active{display:block;}";
+  // أزرار التحكم
+  html += ".mode-switch-box{display:flex;background:var(--input-bg);border:1px solid var(--card-border);padding:4px;border-radius:var(--radius-sm);gap:4px;margin-bottom:12px;}";
+  html += ".mode-btn{flex:1;padding:8px;text-align:center;font-size:13px;font-weight:700;border-radius:7px;text-decoration:none;color:var(--txt-muted);transition:0.2s;}";
+  html += ".mode-btn.active-auto{background:rgba(16,185,129,0.2);color:var(--green);border:1px solid var(--green-glow);}";
+  html += ".mode-btn.active-manual{background:rgba(2,132,199,0.2);color:var(--accent);border:1px solid var(--accent-glow);}";
 
-  // سجل
-  html += ".log-list{display:flex;flex-direction:column;gap:4px;max-height:150px;overflow-y:auto;}";
-  html += ".log-item{font-size:12px;color:var(--g600);padding:6px 10px;background:var(--g50);border-radius:6px;border-right:3px solid var(--g200);}";
+  html += ".btn{display:flex;align-items:center;justify-content:center;padding:12px 14px;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;transition:0.2s;}";
+  html += ".btn:active{transform:scale(0.98);opacity:0.9;}";
+  html += ".btn-accent{background:var(--accent);color:white;box-shadow:0 4px 12px var(--accent-glow);}";
+  html += ".btn-green{background:var(--green);color:white;box-shadow:0 4px 12px var(--green-glow);}";
+  html += ".btn-red{background:var(--red);color:white;box-shadow:0 4px 12px var(--red-glow);}";
+  html += ".btn-amber{background:var(--amber);color:white;box-shadow:0 4px 12px var(--amber-glow);}";
+  html += ".btn-outline{background:transparent;color:var(--txt-muted);border:1px solid var(--card-border);}";
+  html += ".btn-outline:hover{background:rgba(255,255,255,0.05);color:var(--txt);}";
+  html += ".btn-full{width:100%;}";
 
-  // إعدادات
-  html += ".set-section{margin-bottom:14px;}";
-  html += ".set-title{font-size:10px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;";
-  html += "padding-bottom:5px;border-bottom:1.5px solid var(--blue-lt);margin-bottom:9px;}";
-  html += ".set-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;}";
-  html += ".set-lbl{font-size:13px;color:var(--g600);font-weight:600;}";
-  html += ".set-inp{width:80px;padding:7px;border:1.5px solid var(--g200);border-radius:var(--rs);font-size:13px;text-align:center;outline:none;}";
-  html += ".set-inp:focus{border-color:var(--blue);}";
-  html += ".set-hint{font-size:10px;color:var(--g400);text-align:center;margin-top:6px;}";
+  // أزرار التايمر السريع
+  html += ".preset-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px;}";
+  html += ".preset-btn{background:var(--input-bg);border:1px solid var(--card-border);color:var(--txt);padding:8px 4px;font-size:12px;font-weight:700;border-radius:8px;text-align:center;text-decoration:none;transition:0.15s;}";
+  html += ".preset-btn:hover{border-color:var(--accent);color:var(--accent);}";
 
-  html += "</style></head><body><div class='page'>";
+  // التبويبات التنظيمية
+  html += ".tab-nav{display:flex;background:var(--card-bg);border:1px solid var(--card-border);padding:4px;border-radius:var(--radius);gap:4px;}";
+  html += ".tab-link{flex:1;padding:10px 4px;text-align:center;font-size:12px;font-weight:700;color:var(--txt-muted);border:none;background:transparent;border-radius:var(--radius-sm);cursor:pointer;transition:0.2s;}";
+  html += ".tab-link.active{background:rgba(2,132,199,0.15);color:var(--accent);border:1px solid var(--accent-glow);}";
+  html += ".tab-content{display:none;}.tab-content.active{display:block;}";
 
-  // رأس الصفحة
-  html += "<div class='hdr'><div class='hdr-title'>متحكم مضخة المياه الذكي</div>";
-  html += "<div class='hdr-time' id='sysTimeLabel'>" + sysTime + "</div></div>";
+  // القوائم والإعدادات
+  html += ".log-list{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;}";
+  html += ".log-item{font-size:12px;color:var(--txt-muted);padding:8px 12px;background:var(--input-bg);border-radius:8px;border-right:3px solid var(--accent);display:flex;align-items:center;justify-content:space-between;}";
 
-  // شريط الوضع مع السوتش
-  html += "<div class='mode-bar'>";
+  html += ".form-group{margin-bottom:12px;}";
+  html += ".form-label{display:block;font-size:12px;color:var(--txt-muted);font-weight:600;margin-bottom:6px;}";
+  html += ".form-input{width:100%;padding:10px 12px;background:var(--input-bg);border:1px solid var(--card-border);border-radius:var(--radius-sm);color:var(--txt);font-size:13px;outline:none;}";
+  html += ".form-input:focus{border-color:var(--accent);}";
+
+  html += "</style></head><body>";
+  html += "<div class='app-container'>";
+
+  // 1. الهيدر وشريط الحالة
+  html += "<div class='hdr'>";
+  html += "<div class='hdr-brand'><div class='hdr-icon'>💧</div>";
+  html += "<div><div class='hdr-title'>متحكم المضخة الذكي</div><div class='hdr-subtitle'>SmartPump IoT System</div></div></div>";
+  html += "<div class='hdr-clock' id='sysTimeLabel'>" + sysTime + "</div></div>";
+
+  // 2. شريط حالة الاتصال والوضع
+  html += "<div class='conn-bar'>";
   if (systemError) {
-    html += "<div class='mode-info'><div class='mdot err'></div><div class='mlabel'>حالة النظام</div></div>";
-    html += "<div class='switch-link'><span class='switch-lbl err'>طوارئ (مقفل)</span><div class='switch-box err'><div class='switch-thumb'></div></div></div>";
+    html += "<div class='badge badge-err'><span class='badge-dot'></span>حالة الطوارئ (مقفل)</div>";
   } else if (manualMode) {
-    html += "<div class='mode-info'><div class='mdot manual'></div><div class='mlabel'>وضع التشغيل</div></div>";
-    html += "<a href='/toggle-mode' class='switch-link' title='انقر للتبديل للتلقائي'>";
-    html += "<span class='switch-lbl manual'>يدوي</span>";
-    html += "<div class='switch-box manual'><div class='switch-thumb'></div></div></a>";
+    html += "<div class='badge badge-manual'><span class='badge-dot'></span>الوضع اليدوي</div>";
   } else {
-    html += "<div class='mode-info'><div class='mdot auto'></div><div class='mlabel'>وضع التشغيل</div></div>";
-    html += "<a href='/toggle-mode' class='switch-link' title='انقر للتبديل لليدوي'>";
-    html += "<span class='switch-lbl auto'>تلقائي</span>";
-    html += "<div class='switch-box auto'><div class='switch-thumb'></div></div></a>";
+    html += "<div class='badge badge-auto'><span class='badge-dot'></span>الوضع التلقائي</div>";
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    html += "<div class='wifi-status'><span class='wifi-dot on'></span>متصل: " + wifiSSID + "</div>";
+  } else {
+    html += "<div class='wifi-status'><span class='wifi-dot off'></span>نقطة بث AP</div>";
   }
   html += "</div>";
 
-  // بطاقة الحالة
-  html += "<div class='s-card'><div class='s-text' id='statusText'>" + currentStatus + "</div>";
-  html += "<div class='s-meta' id='pumpRow'>";
+  // 3. التبويبات التنظيمية للوحة التحكم
+  html += "<div class='tab-nav'>";
+  html += "<button class='tab-link active' onclick=\"openTab(event,'dashboardTab')\">الرئيسية</button>";
+  html += "<button class='tab-link' onclick=\"openTab(event,'logTab')\">سجل العمليات</button>";
+  html += "<button class='tab-link' onclick=\"openTab(event,'wifiTab')\">الواي فاي</button>";
+  html += "<button class='tab-link' onclick=\"openTab(event,'settingsTab')\">الإعدادات</button>";
+  html += "</div>";
+
+  // ---------------------------------------------------------
+  // تبويب الرئيسية (Dashboard Tab)
+  // ---------------------------------------------------------
+  html += "<div id='dashboardTab' class='tab-content active'>";
+  
+  // البطاقة المحورية للحالة
+  html += "<div class='hero-card'>";
+  html += "<div style='font-size:11px;color:var(--txt-muted);font-weight:700;margin-bottom:6px;'>حالة النظام الحالية</div>";
+  html += "<div class='hero-status' id='statusText'>" + currentStatus + "</div>";
+
+  html += "<div class='metrics-grid' id='pumpRow'>";
   if (isPumping && !systemError) {
     long el = (millis() - pumpStartTime) / 1000;
     String elS = (el % 60 < 10 ? "0" : "") + String(el % 60);
-    html += "<div class='s-item'><div class='s-lbl'>الدينمو</div><div class='s-val on'>يعمل</div></div>";
-    html += "<div class='s-item'><div class='s-lbl'>مدة التشغيل</div><div class='s-val tk'>" + String(el/60) + ":" + elS + "</div></div>";
+    html += "<div class='metric-tile'><div class='metric-lbl'>الدينمو</div><div class='metric-val on'>يعمل ⚡</div></div>";
+    html += "<div class='metric-tile'><div class='metric-lbl'>مدة التشغيل</div><div class='metric-val timer'>" + String(el/60) + ":" + elS + "</div></div>";
     if (manualTimerActive) {
       long rem = ((long)manualTimerDuration-(long)(millis()-pumpStartTime))/1000;
       if(rem<0)rem=0;
       String remS=(rem%60<10?"0":"")+String(rem%60);
-      html += "<div class='s-item'><div class='s-lbl'>المتبقي</div><div class='s-val tk' id='statusTimer'>" + String(rem/60) + ":" + remS + "</div></div>";
+      html += "<div class='metric-tile'><div class='metric-lbl'>المتبقي</div><div class='metric-val timer' id='statusTimer'>" + String(rem/60) + ":" + remS + "</div></div>";
+    } else {
+      html += "<div class='metric-tile'><div class='metric-lbl'>المؤقت</div><div class='metric-val off'>مفتوح</div></div>";
     }
   } else {
-    html += "<div class='s-item'><div class='s-lbl'>الدينمو</div><div class='s-val off'>متوقف</div></div>";
+    html += "<div class='metric-tile'><div class='metric-lbl'>الدينمو</div><div class='metric-val off'>متوقف</div></div>";
+    html += "<div class='metric-tile'><div class='metric-lbl'>مدة التشغيل</div><div class='metric-val off'>--:--</div></div>";
+    html += "<div class='metric-tile'><div class='metric-lbl'>المؤقت</div><div class='metric-val off'>غير مفعّل</div></div>";
   }
   html += "</div></div>";
 
-  // بطاقة التحكم
-  html += "<div class='c-card'>";
-  if (systemError) {
-    html += "<div class='sec-lbl'>إجراء مطلوب</div>";
-    html += "<a href='/reset' class='btn red full'>إعادة ضبط النظام</a>";
+  // قسم التحكم السريع
+  html += "<div class='section-card' style='margin-top:14px;'>";
+  html += "<div class='section-hdr'><div class='section-title'>لوحة التحكم والتشغيل</div></div>";
+
+  // سويتش تبديل الوضع
+  html += "<div class='mode-switch-box'>";
+  if (manualMode) {
+    html += "<a href='/toggle-mode' class='mode-btn'>التشغيل التلقائي</a>";
+    html += "<div class='mode-btn active-manual'>التشغيل اليدوي</div>";
   } else {
-    html += "<div class='sec-lbl'>التحكم</div>";
-    if (manualMode) {
-      html += "<div class='pump-ctrl-box'>";
-      html += "<span style='font-size:13px;color:var(--g800);font-weight:700;'>تشغيل الدينمو</span>";
-      if (isPumping) {
-        html += "<a href='/manual-off' class='switch-link' title='انقر لإيقاف الدينمو'>";
-        html += "<span class='switch-lbl on'>يعمل</span>";
-        html += "<div class='switch-box on'><div class='switch-thumb'></div></div></a>";
-      } else {
-        html += "<a href='/manual-on' class='switch-link' title='انقر لتشغيل الدينمو'>";
-        html += "<span class='switch-lbl off'>متوقف</span>";
-        html += "<div class='switch-box off'><div class='switch-thumb'></div></div></a>";
-      }
-      html += "</div>";
-    }
-    html += "<a href='/reset' class='btn ghost full'>تصفير النظام</a>";
-    if (manualMode) {
-      html += "<div class='tmr'><div class='tmr-title'>تايمر الإيقاف التلقائي</div>";
-      if (manualTimerActive && isPumping) {
-        long rem=((long)manualTimerDuration-(long)(millis()-pumpStartTime))/1000;
-        if(rem<0)rem=0;
-        String remS=(rem%60<10?"0":"")+String(rem%60);
-        html += "<div class='tmr-big' id='timerBig'>" + String(rem/60) + ":" + remS + "</div>";
-        html += "<a href='/cancel-timer' class='btn amber'>إلغاء التايمر</a>";
-      } else {
-        html += "<form action='/set-manual-timer' method='GET' style='margin:0'>";
-        html += "<div class='tmr-row'>";
-        html += "<input type='number' name='min' class='tmr-inp' min='1' max='" + String(maxPumpTime/60000UL) + "' placeholder='دقائق' required>";
-        html += "<button type='submit' class='btn blue' style='padding:9px 14px'>تفعيل</button></div></form>";
-        html += "<div class='tmr-hint'>أدخل عدد الدقائق (1 - " + String(maxPumpTime/60000UL) + ")</div>";
-      }
-      html += "</div>";
-    }
+    html += "<div class='mode-btn active-auto'>التشغيل التلقائي</div>";
+    html += "<a href='/toggle-mode' class='mode-btn'>التشغيل اليدوي</a>";
   }
   html += "</div>";
 
-  // التبويبات
-  html += "<div class='tabs'>";
-  html += "<div class='tabs-nav'>";
-  html += "<button class='tab-btn active' onclick=\"openTab(event,'logPane')\">سجل العمليات</button>";
-  html += "<button class='tab-btn' onclick=\"openTab(event,'setPane')\">الإعدادات</button>";
-  html += "</div>";
+  if (systemError) {
+    html += "<a href='/reset' class='btn btn-red btn-full'>إعادة ضبط وتصفير النظام</a>";
+  } else {
+    if (manualMode) {
+      if (isPumping) {
+        html += "<a href='/manual-off' class='btn btn-red btn-full' style='margin-bottom:10px;'>إيقاف الدينمو يدوياً 🛑</a>";
+      } else {
+        html += "<a href='/manual-on' class='btn btn-green btn-full' style='margin-bottom:10px;'>تشغيل الدينمو يدوياً ▶</a>";
+      }
 
-  // السجل
-  html += "<div id='logPane' class='tab-pane active'><div class='log-list' id='logList'>";
+      // أزرار التايمر السريع
+      html += "<div style='background:var(--input-bg);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:12px;margin-top:8px;'>";
+      html += "<div style='font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px;'>تايمر الإيقاف السريع:</div>";
+      html += "<div class='preset-grid'>";
+      html += "<a href='/set-manual-timer?min=5' class='preset-btn'>5 دقائق</a>";
+      html += "<a href='/set-manual-timer?min=10' class='preset-btn'>10 دقائق</a>";
+      html += "<a href='/set-manual-timer?min=15' class='preset-btn'>15 دقيقة</a>";
+      html += "<a href='/set-manual-timer?min=30' class='preset-btn'>30 دقيقة</a>";
+      html += "</div>";
+
+      if (manualTimerActive && isPumping) {
+        html += "<a href='/cancel-timer' class='btn btn-amber btn-full' style='margin-top:10px;padding:8px;'>إلغاء التايمر اليدوي</a>";
+      } else {
+        html += "<form action='/set-manual-timer' method='GET' style='display:flex;gap:6px;margin-top:10px;'>";
+        html += "<input type='number' name='min' class='form-input' min='1' max='" + String(maxPumpTime/60000UL) + "' placeholder='دقائق مخصصة' required>";
+        html += "<button type='submit' class='btn btn-accent' style='white-space:nowrap;padding:8px 14px;'>تفعيل</button>";
+        html += "</form>";
+      }
+      html += "</div>";
+    }
+    html += "<a href='/reset' class='btn btn-outline btn-full' style='margin-top:10px;'>تصفير حالة النظام</a>";
+  }
+  html += "</div></div>";
+
+  // ---------------------------------------------------------
+  // تبويب سجل العمليات (Activity Log Tab)
+  // ---------------------------------------------------------
+  html += "<div id='logTab' class='tab-content'>";
+  html += "<div class='section-card'>";
+  html += "<div class='section-hdr'><div class='section-title'>سجل الأحداث الأخيرة</div></div>";
+  html += "<div class='log-list' id='logList'>";
   for (int i = 0; i < 10; i++) {
     int idx = (logIndex-1-i+10)%10;
-    if (operationLog[idx] != "") html += "<div class='log-item'>" + operationLog[idx] + "</div>";
+    if (operationLog[idx] != "") {
+      html += "<div class='log-item'><span>" + operationLog[idx] + "</span><span style='font-size:10px;color:var(--txt-muted);'>أحدث</span></div>";
+    }
+  }
+  html += "</div></div></div>";
+
+  // ---------------------------------------------------------
+  // تبويب إعدادات الواي فاي (Wi-Fi Settings Tab)
+  // ---------------------------------------------------------
+  html += "<div id='wifiTab' class='tab-content'>";
+  html += "<div class='section-card'>";
+  html += "<div class='section-hdr'><div class='section-title'>إعدادات شبكة الواي فاي</div></div>";
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    html += "<div style='font-size:12px;color:var(--green);font-weight:700;background:rgba(16,185,129,0.1);padding:10px;border-radius:8px;margin-bottom:12px;'>متصل حالياً بـ: " + wifiSSID + " (" + WiFi.localIP().toString() + ")</div>";
+  } else {
+    html += "<div style='font-size:12px;color:var(--amber);font-weight:700;background:rgba(245,158,11,0.1);padding:10px;border-radius:8px;margin-bottom:12px;'>يعمل بنقطة البث المباشر (SmartPump-Setup)</div>";
+  }
+
+  html += "<form action='/set-wifi' method='GET'>";
+  html += "<div class='form-group'><label class='form-label'>اسم شبكة الواي فاي (SSID)</label>";
+  html += "<input type='text' name='ssid' class='form-input' value='" + wifiSSID + "' placeholder='اسم الشبكة' required></div>";
+  html += "<div class='form-group'><label class='form-label'>كلمة المرور</label>";
+  html += "<input type='password' name='password' class='form-input' placeholder='كلمة المرور'></div>";
+  html += "<button type='submit' class='btn btn-accent btn-full'>حفظ والاتصال بالشبكة</button>";
+  html += "</form>";
+
+  if (wifiSSID.length() > 0) {
+    html += "<a href='/forget-wifi' class='btn btn-outline btn-full' style='margin-top:8px;color:var(--red);border-color:rgba(244,63,94,0.3);'>مسح الشبكة المحفوظة</a>";
   }
   html += "</div></div>";
 
-  // الإعدادات
-  html += "<div id='setPane' class='tab-pane'>";
-
-  // قسم إضافة / إعداد شبكة الواي فاي
-  html += "<div class='set-section'>";
-  html += "<div class='set-title'>إعداد شبكة الواي فاي (Wi-Fi)</div>";
-  if (WiFi.status() == WL_CONNECTED) {
-    html += "<div style='font-size:12px;color:var(--green);font-weight:700;margin-bottom:8px;'>متصل حالياً بـ: " + wifiSSID + " (" + WiFi.localIP().toString() + ")</div>";
-  } else {
-    html += "<div style='font-size:12px;color:var(--amber);font-weight:700;margin-bottom:8px;'>يعمل بنقطة البث المباشر (SmartPump-Setup)</div>";
-  }
-  html += "<form action='/set-wifi' method='GET'>";
-  html += "<div class='set-row'><span class='set-lbl'>اسم الشبكة (SSID)</span>";
-  html += "<input type='text' name='ssid' class='set-inp' style='width:140px;text-align:right' value='" + wifiSSID + "' placeholder='اسم الشبكة' required></div>";
-  html += "<div class='set-row'><span class='set-lbl'>كلمة المرور</span>";
-  html += "<input type='password' name='password' class='set-inp' style='width:140px;text-align:right' placeholder='كلمة المرور'></div>";
-  html += "<button type='submit' class='btn blue full' style='margin-top:6px'>حفظ والاتصال بالشبكة</button>";
-  html += "</form>";
-  if (wifiSSID.length() > 0) {
-    html += "<a href='/forget-wifi' class='btn ghost full' style='margin-top:6px;color:var(--red)'>مسح الشبكة المحفوظة</a>";
-  }
-  html += "</div>";
-
-  // قسم إعدادات حماية المضخة ووقت الهدوء
+  // ---------------------------------------------------------
+  // تبويب إعدادات الحماية والهدوء (Settings Tab)
+  // ---------------------------------------------------------
+  html += "<div id='settingsTab' class='tab-content'>";
   html += "<form action='/set-timeout' method='GET'>";
-  html += "<div class='set-section'>";
-  html += "<div class='set-title'>حماية المضخة</div>";
-  html += "<div class='set-row'><span class='set-lbl'>وقت الطوارئ (دقائق)</span>";
-  html += "<input type='number' name='minutes' class='set-inp' min='1' max='300' value='" + String(maxPumpTime/60000UL) + "' required></div>";
-  html += "<div class='set-row'><span class='set-lbl'>كشف رفع الماء (ثواني)</span>";
-  html += "<input type='number' name='liftSec' class='set-inp' min='1' max='300' value='" + String(liftTimeout/1000UL) + "' required></div>";
+  
+  html += "<div class='section-card' style='margin-bottom:12px;'>";
+  html += "<div class='section-hdr'><div class='section-title'>إعدادات حماية المضخة</div></div>";
+  html += "<div class='form-group'><label class='form-label'>وقت أمان الطوارئ الأقصى (دقائق)</label>";
+  html += "<input type='number' name='minutes' class='form-input' min='1' max='300' value='" + String(maxPumpTime/60000UL) + "' required></div>";
+  html += "<div class='form-group'><label class='form-label'>فترة مهلة كشف رفع الماء (ثواني)</label>";
+  html += "<input type='number' name='liftSec' class='form-input' min='1' max='300' value='" + String(liftTimeout/1000UL) + "' required></div>";
   html += "</div>";
 
-  html += "<div class='set-section'>";
-  html += "<div class='set-title'>وقت الهدوء</div>";
-  html += "<div class='set-row'><span class='set-lbl'>تفعيل وقت الهدوء</span>";
-  html += "<input type='checkbox' name='quietEnabled' value='1' style='width:18px;height:18px;cursor:pointer;accent-color:var(--blue)' " + String(quietModeEnabled ? "checked" : "") + "></div>";
-  html += "<div class='set-row'><span class='set-lbl'>ساعة البدء (0-23)</span>";
-  html += "<input type='number' name='quietStart' class='set-inp' min='0' max='23' value='" + String(quietStartHour) + "'></div>";
-  html += "<div class='set-row'><span class='set-lbl'>ساعة الانتهاء (0-23)</span>";
-  html += "<input type='number' name='quietEnd' class='set-inp' min='0' max='23' value='" + String(quietEndHour) + "'></div>";
+  html += "<div class='section-card'>";
+  html += "<div class='section-hdr'><div class='section-title'>وقت الهدوء المحظور</div></div>";
+  html += "<div class='form-group' style='display:flex;align-items:center;justify-content:space-between;'>";
+  html += "<span class='form-label' style='margin:0;'>تفعيل وقت الهدوء المحظور</span>";
+  html += "<input type='checkbox' name='quietEnabled' value='1' style='width:20px;height:20px;accent-color:var(--accent);' " + String(quietModeEnabled ? "checked" : "") + ">";
+  html += "</div>";
+  html += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;'>";
+  html += "<div class='form-group'><label class='form-label'>ساعة البدء (0-23)</label>";
+  html += "<input type='number' name='quietStart' class='form-input' min='0' max='23' value='" + String(quietStartHour) + "'></div>";
+  html += "<div class='form-group'><label class='form-label'>ساعة الانتهاء (0-23)</label>";
+  html += "<input type='number' name='quietEnd' class='form-input' min='0' max='23' value='" + String(quietEndHour) + "'></div>";
+  html += "</div>";
+  html += "<button type='submit' class='btn btn-accent btn-full' style='margin-top:8px;'>حفظ جميع الإعدادات</button>";
   html += "</div>";
 
-  html += "<button type='submit' class='btn blue full' style='margin-top:4px'>حفظ إعدادات النظام</button>";
-  html += "<div class='set-hint'>الطوارئ: 1-300 دقيقة &nbsp;|&nbsp; الرفع: 1-300 ثانية &nbsp;|&nbsp; الهدوء: 0-23</div>";
   html += "</form></div>";
 
-  html += "</div></div>"; // tabs + page
+  html += "</div>"; // app-container
 
-  // جافا سكريبت للتبويب والتحديث اللحظي
+  // جافا سكريبت التفاعلي للتحديث التلقائي والتبويبات
   html += "<script>";
   html += "function openTab(e, tabId) {";
-  html += "  document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.remove('active'); });";
-  html += "  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });";
+  html += "  document.querySelectorAll('.tab-content').forEach(function(p){ p.classList.remove('active'); });";
+  html += "  document.querySelectorAll('.tab-link').forEach(function(b){ b.classList.remove('active'); });";
   html += "  var target = document.getElementById(tabId);";
   html += "  if (target) target.classList.add('active');";
   html += "  if (e && e.currentTarget) e.currentTarget.classList.add('active');";
@@ -297,18 +334,6 @@ void handleRoot() {
   html += "    var pr = document.getElementById('pumpRow'); if (pr) pr.innerHTML = d.pumpRow;";
   html += "    var ll = document.getElementById('logList'); if (ll) ll.innerHTML = d.logs;";
   html += "    var tl = document.getElementById('sysTimeLabel'); if (tl) tl.textContent = d.systemTime;";
-  html += "    var tb = document.getElementById('timerBig');";
-  html += "    if (tb && d.timerRemaining >= 0) {";
-  html += "      var m = Math.floor(d.timerRemaining / 60);";
-  html += "      var s = d.timerRemaining % 60;";
-  html += "      tb.textContent = m + ':' + (s < 10 ? '0' : '') + s;";
-  html += "    }";
-  html += "    var tc = document.getElementById('statusTimer');";
-  html += "    if (tc && d.timerRemaining >= 0) {";
-  html += "      var m = Math.floor(d.timerRemaining / 60);";
-  html += "      var s = d.timerRemaining % 60;";
-  html += "      tc.textContent = m + ':' + (s < 10 ? '0' : '') + s;";
-  html += "    }";
   html += "  }).catch(function(err){});";
   html += "}";
   html += "setInterval(updateData, 1000);";
@@ -317,6 +342,9 @@ void handleRoot() {
   server.send(200, "text/html", html);
 }
 
+// ---------------------------------------------------------
+// دالة الاستجابة اللحظية JSON
+// ---------------------------------------------------------
 void handleStatus() {
   String json = "{";
   json += "\"status\":\"" + currentStatus + "\",";
@@ -325,17 +353,21 @@ void handleStatus() {
   if (isPumping && !systemError) {
     long elapsed = (millis() - pumpStartTime) / 1000;
     String elS = (elapsed % 60 < 10 ? "0" : "") + String(elapsed % 60);
-    pumpRow += "<div class='s-item'><div class='s-lbl'>الدينمو</div><div class='s-val on'>يعمل</div></div>";
-    pumpRow += "<div class='s-item'><div class='s-lbl'>مدة التشغيل</div><div class='s-val tk'>" + String(elapsed / 60) + ":" + elS + "</div></div>";
+    pumpRow += "<div class='metric-tile'><div class='metric-lbl'>الدينمو</div><div class='metric-val on'>يعمل ⚡</div></div>";
+    pumpRow += "<div class='metric-tile'><div class='metric-lbl'>مدة التشغيل</div><div class='metric-val timer'>" + String(elapsed / 60) + ":" + elS + "</div></div>";
     
     if (manualTimerActive) {
       long remaining = ((long)manualTimerDuration - (long)(millis() - pumpStartTime)) / 1000;
       if (remaining < 0) remaining = 0;
       String remS = (remaining % 60 < 10 ? "0" : "") + String(remaining % 60);
-      pumpRow += "<div class='s-item'><div class='s-lbl'>المتبقي</div><div class='s-val tk' id='statusTimer'>" + String(remaining / 60) + ":" + remS + "</div></div>";
+      pumpRow += "<div class='metric-tile'><div class='metric-lbl'>المتبقي</div><div class='metric-val timer' id='statusTimer'>" + String(remaining / 60) + ":" + remS + "</div></div>";
+    } else {
+      pumpRow += "<div class='metric-tile'><div class='metric-lbl'>المؤقت</div><div class='metric-val off'>مفتوح</div></div>";
     }
   } else {
-    pumpRow += "<div class='s-item'><div class='s-lbl'>الدينمو</div><div class='s-val off'>متوقف</div></div>";
+    pumpRow += "<div class='metric-tile'><div class='metric-lbl'>الدينمو</div><div class='metric-val off'>متوقف</div></div>";
+    pumpRow += "<div class='metric-tile'><div class='metric-lbl'>مدة التشغيل</div><div class='metric-val off'>--:--</div></div>";
+    pumpRow += "<div class='metric-tile'><div class='metric-lbl'>المؤقت</div><div class='metric-val off'>غير مفعّل</div></div>";
   }
   json += "\"pumpRow\":\"" + pumpRow + "\",";
 
@@ -350,7 +382,7 @@ void handleStatus() {
   for (int i = 0; i < 10; i++) {
     int idx = (logIndex - 1 - i + 10) % 10;
     if (operationLog[idx] != "") {
-      logs += "<div class='log-item'>" + operationLog[idx] + "</div>";
+      logs += "<div class='log-item'><span>" + operationLog[idx] + "</span><span style='font-size:10px;color:var(--txt-muted);'>أحدث</span></div>";
     }
   }
   json += "\"logs\":\"" + logs + "\",";
