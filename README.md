@@ -44,7 +44,8 @@ An intelligent electromechanical system designed for controlling water pumps (dy
 | **D6** | `GPIO 12` | Warning Sensor (`warningSensorPin`) | Early notification before water depletes |
 | **D7** | `GPIO 13` | Water Lift Sensor (`liftSensorPin`) | Positioned at pipe outlet to verify water flow |
 | **D3** | `GPIO 0` | Sensor Power Supply (`powerPin`) | Pulsed power supply to sensors to prevent chemical electrolysis |
-| **D4 / LED** | `GPIO 2` | Built-in LED (`ledPin`) | System heartbeat indicator (blinks non-blockingly while ESP is running) |
+| **D4 / LED1** | `GPIO 2` | Built-in LED 1 (`ledPin1`) | System & Pump status indicator (Solid ON: Pumping, Rapid Blink: Error, Pulse: Heartbeat) |
+| **D0 / LED2** | `GPIO 16` | Built-in LED 2 (`ledPin2`) | Wi-Fi Status indicator (Solid ON: Connected to Router, Slow Blink: AP Setup Mode) |
 
 ---
 

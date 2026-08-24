@@ -15,12 +15,14 @@ const char* apPassword = "";            // كلمة مرور البث (مفتو�
 ESP8266WebServer server(80);
 
 // --- تعريف دبابيس التوصيل ---
-const int relayPin = 5;       // D1: للتحكم بالدينمو
-const int highSensorPin = 4;  // D2: السلك العلوي (نقطة الإيقاف)
-const int lowSensorPin = 14;  // D5: السلك السفلي (نقطة التشغيل)
+const int relayPin = 5;          // D1: للتحكم بالدينمو
+const int highSensorPin = 4;     // D2: السلك العلوي (نقطة الإيقاف)
+const int lowSensorPin = 14;     // D5: السلك السفلي (نقطة التشغيل)
 const int warningSensorPin = 12; // D6: سلك التحذير (قبل النفاد)
-const int powerPin = 0;       // D3: سلك الطاقة في القاع
-const int liftSensorPin = 13; // D7: سلك كشف رفع الماء (عند مصب الأنبوب)
+const int powerPin = 0;          // D3: سلك الطاقة في القاع
+const int liftSensorPin = 13;    // D7: سلك كشف رفع الماء (عند مصب الأنبوب)
+const int ledPin1 = 2;           // D4: اليد المدمج الأول (GPIO 2 / LED_BUILTIN) - مؤشر حالة المضخة والنظام
+const int ledPin2 = 16;          // D0: اليد المدمج الثاني (GPIO 16 / NodeMCU LED) - مؤشر حالة الواي فاي
 
 // --- متغيرات حالة النظام ---
 bool isPumping = false; 
@@ -686,6 +688,50 @@ void handleSetTimeout() {
   server.send(303);
 }
 
+// --- دالة التحكم في إضاءة اليد المدمج الأول والثاني (بدون delay) ---
+void updateStatusLEDs() {
+  unsigned long currentMillis = millis();
+
+  // 1. التحكم في اليد المدمج الأول (ledPin1 - D4 / GPIO 2): حالة المضخة والنظام
+  if (systemError) {
+    // خطأ بالنظام: وميض سريع جداً (100 ملي ثانية)
+    static unsigned long lastBlink1 = 0;
+    static bool ledState1 = HIGH;
+    if (currentMillis - lastBlink1 >= 100) {
+      lastBlink1 = currentMillis;
+      ledState1 = !ledState1;
+      digitalWrite(ledPin1, ledState1);
+    }
+  } else if (isPumping) {
+    // مضخة تعمل: إضاءة مستمرة (LOW = تشغيل)
+    digitalWrite(ledPin1, LOW);
+  } else {
+    // حالة الاستعداد (طبيعي): نبضة هارت بيت كل ثانيتين
+    static unsigned long lastHeartbeat = 0;
+    if (currentMillis - lastHeartbeat >= 2000) {
+      lastHeartbeat = currentMillis;
+      digitalWrite(ledPin1, LOW); // إضاءة قصيرة
+    } else if (currentMillis - lastHeartbeat >= 50) {
+      digitalWrite(ledPin1, HIGH); // إطفاء
+    }
+  }
+
+  // 2. التحكم في اليد المدمج الثاني (ledPin2 - D0 / GPIO 16): حالة الواي فاي
+  if (WiFi.status() == WL_CONNECTED) {
+    // متصل بالراوتر: إضاءة مستمرة (LOW = تشغيل)
+    digitalWrite(ledPin2, LOW);
+  } else {
+    // غير متصل / يعمل بنقطة البث AP: وميض بطيء (500 ملي ثانية)
+    static unsigned long lastBlink2 = 0;
+    static bool ledState2 = HIGH;
+    if (currentMillis - lastBlink2 >= 500) {
+      lastBlink2 = currentMillis;
+      ledState2 = !ledState2;
+      digitalWrite(ledPin2, ledState2);
+    }
+  }
+}
+
 // ---------------------------------------------------------
 void setup() {
   Serial.begin(115200);
@@ -700,9 +746,13 @@ void setup() {
   pinMode(lowSensorPin, INPUT_PULLUP);
   pinMode(warningSensorPin, INPUT_PULLUP);
   pinMode(liftSensorPin, INPUT_PULLUP);
+  pinMode(ledPin1, OUTPUT);
+  pinMode(ledPin2, OUTPUT);
 
   digitalWrite(powerPin, HIGH); 
   digitalWrite(relayPin, HIGH);
+  digitalWrite(ledPin1, HIGH); // إطفاء مبدئي (Active LOW)
+  digitalWrite(ledPin2, HIGH); // إطفاء مبدئي (Active LOW)
 
   // تهيئة وتزامن وقت النظام عبر الإنترنت (GMT+3)
   configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
@@ -767,7 +817,10 @@ void loop() {
   // 1. الاستماع لطلبات المتصفح
   server.handleClient();
 
-  // 2. فحص مستوى الماء كل ثانيتين
+  // 2. تحديث إضاءة اليد المدمج الأول والثاني (مؤشرات النظام والواي فاي)
+  updateStatusLEDs();
+
+  // 3. فحص مستوى الماء كل ثانيتين
   if (millis() - lastSensorRead >= 2000) {
     lastSensorRead = millis();
 
